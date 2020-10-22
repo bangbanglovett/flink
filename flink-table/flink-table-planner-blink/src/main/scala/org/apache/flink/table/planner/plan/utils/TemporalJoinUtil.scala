@@ -198,7 +198,7 @@ object TemporalJoinUtil {
   }
 
   def isRowTimeTemporalJoinConditionCall(rexCall: RexCall): Boolean = {
-    rexCall.getOperator == TEMPORAL_JOIN_CONDITION && rexCall.operands.length > 3
+    rexCall.getOperator == TEMPORAL_JOIN_CONDITION && rexCall.operands.length == 5
   }
 
 }

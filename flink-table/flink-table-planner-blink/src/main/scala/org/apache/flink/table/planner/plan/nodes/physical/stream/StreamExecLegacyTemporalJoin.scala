@@ -34,7 +34,7 @@ import org.apache.flink.table.planner.plan.utils.LegacyTemporalJoinUtil.LEGACY_T
 import org.apache.flink.table.planner.plan.utils.{InputRefVisitor, KeySelectorUtil, LegacyTemporalJoinUtil, RelExplainUtil}
 import org.apache.flink.table.runtime.generated.GeneratedJoinCondition
 import org.apache.flink.table.runtime.keyselector.RowDataKeySelector
-import org.apache.flink.table.runtime.operators.join.temporal.{LegacyTemporalProcessTimeJoinOperator, LegacyTemporalRowTimeJoinOperator}
+import org.apache.flink.table.runtime.operators.join.temporal.{LegacyTemporalRowTimeJoinOperator, TemporalProcessTimeJoinOperator}
 import org.apache.flink.table.runtime.typeutils.InternalTypeInfo
 import org.apache.flink.table.types.logical.RowType
 import org.apache.flink.util.Preconditions.checkState
@@ -257,11 +257,12 @@ class StreamExecLegacyTemporalJoinToCoProcessTranslator private(
             minRetentionTime,
             maxRetentionTime)
         } else {
-          new LegacyTemporalProcessTimeJoinOperator(
+          new TemporalProcessTimeJoinOperator(
             InternalTypeInfo.of(rightInputType),
             generatedJoinCondition,
             minRetentionTime,
-            maxRetentionTime)
+            maxRetentionTime,
+            false)
         }
       case _ =>
         throw new ValidationException(

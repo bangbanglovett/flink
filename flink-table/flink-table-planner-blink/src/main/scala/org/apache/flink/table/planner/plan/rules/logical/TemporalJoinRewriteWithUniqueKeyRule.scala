@@ -37,8 +37,8 @@ import scala.collection.JavaConversions._
   * table join requires primary key and row time attribute of versioned table. The versioned table
   * could be a table source or a view only if it contains the unique key and time attribute.
   *
-  * <p> Flink support extract the primary key and row time attribute from the view if the view comes
-  * from [[LogicalRank]] node which can convert to a [[Deduplicate]] node.
+  * <p> Flink supports extract the primary key and row time attribute from the view if the view
+  * comes from [[LogicalRank]] node which can convert to a [[Deduplicate]] node.
   */
 class TemporalJoinRewriteWithUniqueKeyRule extends RelOptRule(
   operand(classOf[FlinkLogicalJoin],

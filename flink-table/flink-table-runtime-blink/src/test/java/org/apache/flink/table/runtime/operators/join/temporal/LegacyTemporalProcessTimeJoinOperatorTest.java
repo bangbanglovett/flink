@@ -169,7 +169,7 @@ public class LegacyTemporalProcessTimeJoinOperatorTest extends LegacyTemporalTim
 	 */
 	@Test
 	public void testProcTimeTemporalJoinOnChangelog() throws Exception {
-  		TemporalProcessTimeJoinOperator joinOperator = new TemporalProcessTimeJoinOperator(
+		TemporalProcessTimeJoinOperator joinOperator = new TemporalProcessTimeJoinOperator(
 				rowType,
 				joinCondition,
 				0,

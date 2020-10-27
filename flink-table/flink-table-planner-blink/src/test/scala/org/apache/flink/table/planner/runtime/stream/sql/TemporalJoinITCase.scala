@@ -40,16 +40,23 @@ class TemporalJoinITCase(state: StateBackendMode)
     changelogRow("+I", toJLong(1), "Euro", "no1", toJLong(12)),
     changelogRow("+I", toJLong(2), "US Dollar", "no1", toJLong(14)),
     changelogRow("+I", toJLong(3), "US Dollar", "no2", toJLong(18)),
-    changelogRow("+I", toJLong(4), "RMB", "no1", toJLong(40)),
-    // simply test left stream could be changelog,
-    // -U or -D message may retract fail in COLLECTION sink check
-    changelogRow("+U", toJLong(4), "RMB", "no1", toJLong(60)))
+    changelogRow("+I", toJLong(4), "RMB", "no1", toJLong(40)))
 
   val procTimeCurrencyData = List(
     changelogRow("+I","Euro", "no1", toJLong(114)),
     changelogRow("+I","US Dollar", "no1", toJLong(102)),
     changelogRow("+I","Yen", "no1", toJLong(1)),
     changelogRow("+I","RMB", "no1", toJLong(702)),
+    changelogRow("+I","Euro", "no1", toJLong(118)),
+    changelogRow("+I","US Dollar", "no2", toJLong(106)))
+
+  val procTimeCurrencyChangelogData = List(
+    changelogRow("+I","Euro", "no1", toJLong(114)),
+    changelogRow("+I","US Dollar", "no1", toJLong(102)),
+    changelogRow("+I","Yen", "no1", toJLong(1)),
+    changelogRow("+I","RMB", "no1", toJLong(702)),
+    changelogRow("-U","RMB", "no1", toJLong(702)),
+    changelogRow("+U","RMB", "no1", toJLong(802)),
     changelogRow("+I","Euro", "no1", toJLong(118)),
     changelogRow("+I","US Dollar", "no2", toJLong(106)))
 
@@ -69,7 +76,6 @@ class TemporalJoinITCase(state: StateBackendMode)
          |) WITH (
          |  'connector' = 'values',
          |  'bounded' = 'false',
-         |  'changelog-mode' = 'I,UA,UB,D',
          |  'data-id' = '$procTimeOrderDataId'
          |)
          |""".stripMargin)
@@ -91,6 +97,7 @@ class TemporalJoinITCase(state: StateBackendMode)
          |)
          |""".stripMargin)
 
+    val procTimeCurrencyChangelogDataId = registerData(procTimeCurrencyChangelogData)
     tEnv.executeSql(
       s"""
          |CREATE TABLE changelog_currency_proctime (
@@ -103,7 +110,7 @@ class TemporalJoinITCase(state: StateBackendMode)
          |  'bounded' = 'false',
          |  'disable-lookup' = 'true',
          |  'changelog-mode' = 'I,UA,UB,D',
-         |  'data-id' = '$procTimeCurrencyDataId'
+         |  'data-id' = '$procTimeCurrencyChangelogDataId'
          |)
          |""".stripMargin)
 

@@ -33,13 +33,15 @@ import org.junit.Test;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.apache.flink.table.runtime.util.StreamRecordUtils.deleteRecord;
 import static org.apache.flink.table.runtime.util.StreamRecordUtils.insertRecord;
-import static org.apache.flink.table.runtime.util.StreamRecordUtils.record;
+import static org.apache.flink.table.runtime.util.StreamRecordUtils.updateAfterRecord;
+import static org.apache.flink.table.runtime.util.StreamRecordUtils.updateBeforeRecord;
 
 /**
  * Harness tests for {@link TemporalProcessTimeJoinOperator}.
  */
-public class LegacyTemporalProcessTimeJoinOperatorTest extends LegacyTemporalTimeJoinOperatorTestBase {
+public class TemporalProcessTimeJoinOperatorTest extends TemporalTimeJoinOperatorTestBase {
 
 	private int keyIdx = 0;
 	private InternalTypeInfo<RowData> rowType = InternalTypeInfo.ofFields(
@@ -182,19 +184,19 @@ public class LegacyTemporalProcessTimeJoinOperatorTest extends LegacyTemporalTim
 		testHarness.processElement1(insertRecord(1L, "1a1"));
 
 		testHarness.setProcessingTime(2);
-		testHarness.processElement2(record(RowKind.INSERT, 2L, "2a2"));
+		testHarness.processElement2(insertRecord( 2L, "2a2"));
 
 		testHarness.setProcessingTime(3);
 		testHarness.processElement1(insertRecord(2L, "2a3"));
 
 		testHarness.setProcessingTime(4);
-		testHarness.processElement2(record(RowKind.INSERT, 1L, "1a4"));
-		testHarness.processElement2(record(RowKind.UPDATE_BEFORE, 1L, "1a4"));
-		testHarness.processElement2(record(RowKind.UPDATE_AFTER, 1L, "1a7"));
+		testHarness.processElement2(insertRecord(1L, "1a4"));
+		testHarness.processElement2(updateBeforeRecord( 1L, "1a4"));
+		testHarness.processElement2(updateAfterRecord(1L, "1a7"));
 
 		testHarness.setProcessingTime(5);
 		testHarness.processElement1(insertRecord(1L, "1a5"));
-		testHarness.processElement2(record(RowKind.DELETE, 1L, "1a7"));
+		testHarness.processElement2(deleteRecord(1L, "1a7"));
 
 		testHarness.setProcessingTime(6);
 		testHarness.processElement1(insertRecord(1L, "1a6"));

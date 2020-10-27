@@ -67,8 +67,7 @@ public class TemporalProcessTimeJoinOperator
 			GeneratedJoinCondition generatedJoinCondition,
 			long minRetentionTime,
 			long maxRetentionTime,
-			boolean isLeftOuterJoin
-			) {
+			boolean isLeftOuterJoin) {
 		super(minRetentionTime, maxRetentionTime);
 		this.rightType = rightType;
 		this.generatedJoinCondition = generatedJoinCondition;
@@ -98,27 +97,26 @@ public class TemporalProcessTimeJoinOperator
 
 		if (rightSideRow == null) {
 			if (isLeftOuterJoin) {
-				padNullForLeftOuterJoin(leftSideRow);
+				collectJoinedRow(leftSideRow, rightNullRow);
 			} else {
 				return;
 			}
 		} else {
 			if (joinCondition.apply(leftSideRow, rightSideRow)) {
-				outRow.setRowKind(leftSideRow.getRowKind());
-				outRow.replace(leftSideRow, rightSideRow);
-				collector.collect(outRow);
+				collectJoinedRow(leftSideRow, rightSideRow);
 			} else {
 				if (isLeftOuterJoin) {
-					padNullForLeftOuterJoin(leftSideRow);
+					collectJoinedRow(leftSideRow, rightNullRow);
 				}
 			}
+			// register a cleanup timer only if the rightSideRow is not null
 			registerProcessingCleanupTimer();
 		}
 	}
 
-	private void padNullForLeftOuterJoin(RowData leftSideRow) {
-		outRow.setRowKind(leftSideRow.getRowKind());
-		outRow.replace(leftSideRow, rightNullRow);
+	private void collectJoinedRow(RowData leftRow, RowData rightRow) {
+		outRow.setRowKind(leftRow.getRowKind());
+		outRow.replace(leftRow, rightRow);
 		collector.collect(outRow);
 	}
 

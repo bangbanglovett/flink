@@ -38,7 +38,7 @@ import static org.apache.flink.table.runtime.util.StreamRecordUtils.insertRecord
 /**
  * Harness tests for {@link LegacyTemporalRowTimeJoinOperator}.
  */
-public class LegacyTemporalRowTimeJoinOperatorTest extends LegacyTemporalTimeJoinOperatorTestBase {
+public class TemporalRowTimeJoinOperatorTest extends TemporalTimeJoinOperatorTestBase {
 	private InternalTypeInfo<RowData> rowType = InternalTypeInfo.ofFields(
 			new BigIntType(),
 			new VarCharType(VarCharType.MAX_LENGTH),

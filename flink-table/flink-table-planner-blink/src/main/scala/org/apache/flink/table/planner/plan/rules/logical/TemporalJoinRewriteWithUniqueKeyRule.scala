@@ -18,17 +18,16 @@
 
 package org.apache.flink.table.planner.plan.rules.logical
 
+import org.apache.calcite.plan.RelOptRule.{any, operand}
+import org.apache.calcite.plan.{RelOptRule, RelOptRuleCall}
+import org.apache.calcite.rel.RelNode
+import org.apache.calcite.rel.core.JoinRelType
+import org.apache.calcite.rex._
 import org.apache.flink.table.api.ValidationException
 import org.apache.flink.table.planner.plan.metadata.FlinkRelMetadataQuery
 import org.apache.flink.table.planner.plan.nodes.logical.{FlinkLogicalJoin, FlinkLogicalRel, FlinkLogicalSnapshot}
 import org.apache.flink.table.planner.plan.rules.common.CommonTemporalTableJoinRule
-import org.apache.flink.table.planner.plan.schema.TimeIndicatorRelDataType
 import org.apache.flink.table.planner.plan.utils.TemporalJoinUtil
-import org.apache.calcite.plan.RelOptRule.{any, operand}
-import org.apache.calcite.plan.{RelOptRule, RelOptRuleCall, RelOptUtil}
-import org.apache.calcite.rel.RelNode
-import org.apache.calcite.rel.core.JoinRelType
-import org.apache.calcite.rex.{RexBuilder, RexCall, RexInputRef, RexNode, RexShuttle}
 
 import scala.collection.JavaConversions._
 
@@ -69,19 +68,33 @@ class TemporalJoinRewriteWithUniqueKeyRule extends RelOptRule(
 
     val newJoinCondition = joinCondition.accept(new RexShuttle {
       override def visitCall(call: RexCall): RexNode = {
-        if (call.getOperator == TemporalJoinUtil.TEMPORAL_JOIN_CONDITION &&
-        isRowTimeTemporalTableJoin(snapshot)) {
-          val snapshotTimeInputRef = call.operands(0)
-          val rightTimeInputRef = call.operands(1)
-          val leftJoinKey = call.operands(2).asInstanceOf[RexCall].operands
-          val rightJoinKey = call.operands(3).asInstanceOf[RexCall].operands
+        if (call.getOperator == TemporalJoinUtil.INITIAL_TEMPORAL_JOIN_CONDITION) {
+          val (snapshotTimeInputRef, leftJoinKey, rightJoinKey) =
+            TemporalJoinUtil.isInitialRowTimeTemporalTableJoin(call) match {
+              case true =>
+                val snapshotTimeInputRef = call.operands(0)
+                val leftJoinKey = call.operands(2).asInstanceOf[RexCall].operands
+                val rightJoinKey = call.operands(3).asInstanceOf[RexCall].operands
+                (snapshotTimeInputRef, leftJoinKey, rightJoinKey)
+              case false =>
+                val snapshotTimeInputRef = call.operands(0)
+                val leftJoinKey = call.operands(1).asInstanceOf[RexCall].operands
+                val rightJoinKey = call.operands(2).asInstanceOf[RexCall].operands
+                (snapshotTimeInputRef, leftJoinKey, rightJoinKey)
+            }
 
           val rexBuilder = join.getCluster.getRexBuilder
           val primaryKeyInputRefs = extractPrimaryKeyInputRefs(leftInput, snapshot, rexBuilder)
-
           validateRightPrimaryKey(rightJoinKey, primaryKeyInputRefs)
-          TemporalJoinUtil.makeRowTimeTemporalJoinConditionCall(rexBuilder, snapshotTimeInputRef,
-            rightTimeInputRef, leftJoinKey, rightJoinKey, primaryKeyInputRefs.get)
+
+          if (TemporalJoinUtil.isInitialRowTimeTemporalTableJoin(call)) {
+            val rightTimeInputRef = call.operands(1)
+            TemporalJoinUtil.makeRowTimeTemporalTableJoinConCall(rexBuilder, snapshotTimeInputRef,
+              rightTimeInputRef, leftJoinKey, rightJoinKey, primaryKeyInputRefs.get)
+          } else {
+            TemporalJoinUtil.makeProcTimeTemporalTableJoinConCall(rexBuilder, snapshotTimeInputRef,
+              leftJoinKey, rightJoinKey, primaryKeyInputRefs.get)
+          }
         }
         else {
           super.visitCall(call)
@@ -98,9 +111,8 @@ class TemporalJoinRewriteWithUniqueKeyRule extends RelOptRule(
       rightPrimaryKeyInputRefs: Option[Seq[RexNode]]): Unit = {
 
     if (rightPrimaryKeyInputRefs.isEmpty) {
-      throw new ValidationException("Event-Time Temporal Table Join requires both" +
-        s" primary key and row time attribute in versioned table," +
-        s" but no primary key can be found.")
+      throw new ValidationException("Temporal Table Join requires" +
+        s" primary key in versioned table, but no primary key can be found.")
     }
 
     val rightJoinKeyRefIndices = rightJoinKeyExpression
@@ -116,8 +128,8 @@ class TemporalJoinRewriteWithUniqueKeyRule extends RelOptRule(
 
     if (!primaryKeyContainedInJoinKey) {
       throw new ValidationException(
-        s"Join key must be the same as temporal table's primary key " +
-          s"in Event-time temporal table join.")
+        s"Join key must contains temporal table's primary key " +
+          s"in temporal table join.")
     }
   }
 
@@ -150,12 +162,6 @@ class TemporalJoinRewriteWithUniqueKeyRule extends RelOptRule(
       None
     }
   }
-
-  private def isRowTimeTemporalTableJoin(snapshot: FlinkLogicalSnapshot): Boolean =
-    snapshot.getPeriod.getType match {
-      case t: TimeIndicatorRelDataType if t.isEventTime => true
-      case _ => false
-    }
 }
 
 object TemporalJoinRewriteWithUniqueKeyRule {

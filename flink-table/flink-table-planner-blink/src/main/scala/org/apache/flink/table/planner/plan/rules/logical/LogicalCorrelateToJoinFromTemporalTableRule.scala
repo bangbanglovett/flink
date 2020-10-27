@@ -287,10 +287,10 @@ abstract class LogicalCorrelateToJoinFromGeneralTemporalTableRule(
             s" but no row time attribute can be found.")
       }
       // Deal primary key in TemporalJoinRewriteUniqueKeyRule
-      TemporalJoinUtil.makeRowTimeTemporalJoinConditionCall(rexBuilder, snapshotTimeInputRef,
+      TemporalJoinUtil.makeInitialRowTimeTemporalTableJoinCondCall(rexBuilder, snapshotTimeInputRef,
         rightTimeInputRef.get, leftJoinKey, rightJoinKey)
     } else {
-      TemporalJoinUtil.makeProcTimeTemporalJoinConditionCall(
+      TemporalJoinUtil.makeInitialProcTimeTemporalTableJoinConCall(
         rexBuilder, snapshotTimeInputRef, leftJoinKey, rightJoinKey)
     }
 

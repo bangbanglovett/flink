@@ -88,7 +88,8 @@ class TemporalJoinITCase(state: StateBackendMode)
          |  currency STRING,
          |  currency_no STRING,
          |  rate BIGINT,
-         |  proctime as PROCTIME()
+         |  proctime as PROCTIME(),
+         |  PRIMARY KEY(currency, currency_no) NOT ENFORCED
          |) WITH (
          |  'connector' = 'values',
          |  'bounded' = 'false',
@@ -104,7 +105,8 @@ class TemporalJoinITCase(state: StateBackendMode)
          |  currency STRING,
          |  currency_no STRING,
          |  rate BIGINT,
-         |  proctime as PROCTIME()
+         |  proctime as PROCTIME(),
+         |  PRIMARY KEY(currency, currency_no) NOT ENFORCED
          |) WITH (
          |  'connector' = 'values',
          |  'bounded' = 'false',
@@ -209,7 +211,8 @@ class TemporalJoinITCase(state: StateBackendMode)
       " SELECT o.order_id, o.currency, o.amount, o.proctime, r.rate, r.proctime " +
       " FROM orders_proctime AS o " +
       " JOIN latest_rates FOR SYSTEM_TIME AS OF o.proctime AS r " +
-      " ON o.currency = r.currency AND o.amount > r.rate"
+      " ON o.currency = r.currency and o.currency_no = r.currency_no " +
+      " AND o.amount > r.rate"
 
     tEnv.executeSql(sql).await()
   }
@@ -221,7 +224,8 @@ class TemporalJoinITCase(state: StateBackendMode)
       " SELECT o.order_id, o.currency, o.amount, o.proctime, r.rate, r.proctime " +
       " FROM orders_proctime AS o " +
       " LEFT JOIN latest_rates FOR SYSTEM_TIME AS OF o.proctime AS r " +
-      " ON o.currency = r.currency AND o.amount > r.rate"
+      " ON o.currency = r.currency and o.currency_no = r.currency_no" +
+      " AND o.amount > r.rate"
 
     tEnv.executeSql(sql).await()
     val rawResult = getRawResults("proctime_sink7")

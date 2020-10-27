@@ -393,8 +393,7 @@ class TemporalJoinTest extends TableTestBase {
       "ON o.amount = r.rate"
     expectExceptionThrown(
       sqlQuery2,
-      s"Join key must be the same as temporal table's primary key " +
-        s"in Event-time temporal table join",
+      s"Join key must contains temporal table's primary key in temporal table join",
       classOf[ValidationException])
 
     util.addTable(

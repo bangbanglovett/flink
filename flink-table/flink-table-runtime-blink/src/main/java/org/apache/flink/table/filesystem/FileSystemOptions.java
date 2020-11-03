@@ -74,24 +74,37 @@ public class FileSystemOptions {
 							" NOTES: Please make sure that each partition/file should be written" +
 							" atomically, otherwise the reader may get incomplete data.");
 
+	public static final ConfigOption<String> STREAMING_SOURCE_PARTITION_INCLUDE =
+			key("streaming-source.partition.include")
+					.stringType()
+					.defaultValue("all")
+					.withDescription("Option to set the partitions to read, the supported values " +
+							"are \"all\" and \"latest\"," +
+							" the \"all\" means read all partitions; the \"latest\" means read latest " +
+							"partition in order of streaming-source.partition.order, the \"latest\" only works" +
+							" when the streaming hive source table used as temporal table. " +
+							"By default the option is \"all\".\n.");
+
 	public static final ConfigOption<Duration> STREAMING_SOURCE_MONITOR_INTERVAL =
 			key("streaming-source.monitor-interval")
 					.durationType()
 					.defaultValue(Duration.ofMinutes(1))
 					.withDescription("Time interval for consecutively monitoring partition/file.");
 
-	public static final ConfigOption<String> STREAMING_SOURCE_CONSUME_ORDER =
-			key("streaming-source.consume-order")
+	public static final ConfigOption<String> STREAMING_SOURCE_PARTITION_ORDER =
+			key("streaming-source.partition-order")
 					.stringType()
 					.defaultValue("create-time")
-					.withDescription("The consume order of streaming source," +
+					.withDeprecatedKeys("streaming-source.consume-order")
+					.withDescription("The partition order of streaming source," +
 							" support create-time and partition-time." +
 							" create-time compare partition/file creation time, this is not the" +
 							" partition create time in Hive metaStore, but the folder/file modification" +
 							" time in filesystem, if the partition folder somehow gets updated," +
 							" e.g. add new file into folder, it can affect how the data is consumed." +
 							" partition-time compare time represented by partition name.\n" +
-							"For non-partition table, this value should always be 'create-time'.");
+							"For non-partition table, this value should always be 'create-time'." +
+							"The option is equality with deprecated option \"streaming-source.consume-order\".");
 
 	public static final ConfigOption<String> STREAMING_SOURCE_CONSUME_START_OFFSET =
 			key("streaming-source.consume-start-offset")

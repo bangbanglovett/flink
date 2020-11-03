@@ -19,28 +19,34 @@
 package org.apache.flink.connectors.hive.read;
 
 import org.apache.flink.annotation.Internal;
-import org.apache.flink.api.java.tuple.Tuple2;
 
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.Partition;
+import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.thrift.TException;
 
+import java.io.Serializable;
 import java.util.List;
 import java.util.Optional;
+import java.util.Properties;
 import java.util.function.Supplier;
 
 /**
- * Partition strategy for helping fetch hive partitioned table.
+ * Fetcher to fetch the suitable partitions for reader.
+ *
+ * @param <P> The type to describe a partition.
  */
 @Internal
-public interface PartitionDiscovery {
+public interface PartitionFetcher<P> extends Serializable {
 
 	/**
-	 * Fetch partitions by previous timestamp (Including).
+	 * Fetch the partitions from meta store.
+	 *
+	 * @return fetched partition values.
 	 */
-	List<Tuple2<Partition, Long>> fetchPartitions(Context context, long previousTimestamp) throws Exception;
+	List<P> fetch(Context context) throws Exception;
 
 	/**
 	 * Context for fetch partitions, partition information is stored in hive meta store.
@@ -68,11 +74,29 @@ public interface PartitionDiscovery {
 		Path tableLocation();
 
 		/**
+		 * Storage descriptor of table.
+		 * @return
+		 */
+		StorageDescriptor tableSd();
+
+		/**
+		 * Properties of table.
+		 */
+		Properties tableProps();
+
+		/**
 		 * Extract timestamp from partition.
 		 */
 		long extractTimestamp(
 				List<String> partKeys,
 				List<String> partValues,
 				Supplier<Long> fileTime);
+
+		/**
+		 *	Previous timestamp used to filter partition.
+		 */
+		default long previousTimestamp() {
+			return Long.MIN_VALUE;
+		}
 	}
 }

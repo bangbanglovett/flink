@@ -168,9 +168,8 @@ the [example]({{ site.baseurl }}/zh/dev/table/streaming/temporal_tables.html#tem
 temporal table.
 
 When performing the join, the Hive table will be cached in TM memory and each record from the stream
-is looked up in the Hive table to decide whether a match is found. You don't need any extra settings to use a Hive table
-as temporal table. But optionally, you can configure the TTL of the Hive table cache with the following
-property. After the cache expires, the Hive table will be scanned again to load the latest data.
+is looked up in the Hive table to decide whether a match is found. Flink supports load all partition of hive table 
+as temporal table, and also supports load the latest partitions of hive table(need enable hive streaming-source) as temporal table.
 
 <table class="table table-bordered">
   <thead>
@@ -183,18 +182,163 @@ property. After the cache expires, the Hive table will be scanned again to load 
   </thead>
   <tbody>
     <tr>
+        <td><h5>streaming-source.enable</h5></td>
+        <td style="word-wrap: break-word;">false</td>
+        <td>Boolean</td>
+        <td>Enable streaming source or not.
+         **Note:** Please make sure that each partition/file should be written atomically, otherwise the reader may get incomplete data..
+        </td>
+    </tr>
+    <tr>
+        <td><h5>streaming-source.partition.include</h5></td>
+        <td style="word-wrap: break-word;">all</td>
+        <td>String</td>
+        <td>Option to set the partitions to read, the supported option are `all` and `latest`, the `all` means read all partitions; the `latest` means read latest  partition in order of 'streaming-source.partition.order', the `latest` only works` when the streaming hive source table used as temporal table. By default the option is `all`.
+            Flink supports temporal join the latest hive partition by enabling 'streaming-source.monitor-interval' and setting 'streaming-source.partition.include' to 'latest', at the same time, user can assign the partition compare order and data update interval by configuring following partition-related options.  
+        </td>
+    </tr> 
+    <tr>
+        <td><h5>streaming-source.monitor-interval</h5></td>
+        <td style="word-wrap: break-word;">1 m(source table) or 60 m(for temporal table)</td>
+        <td>Duration</td>
+        <td>Time interval for consecutively monitoring partition/file.
+         **Note:** The default interval for hive streaming reading is '1 m', the default interval for hive streaming temporal join is '60 m', this is because there's one framework limitation that every TM will visit the Hive metaStore in current hive streaming temporal join implementation which may produce pressure to metaStore,
+         this will improve in the future.
+        </td>
+    </tr>  
+    <tr>
+        <td><h5>streaming-source.partition-order</h5></td>
+        <td style="word-wrap: break-word;">create-time</td>
+        <td>String</td>
+        <td>The partition order of streaming source, support create-time and partition-time. create-time compare partition/file creation time, this is not the partition create time in Hive metaStore, but the folder/file modification time in filesystem, if the partition folder somehow gets updated, e.g. add new file into folder, it can affect how the data is consumed. partition-time compare time represented by partition name. For non-partition table, this value should always be 'create-time'. The option is equality with deprecated option 'streaming-source.consume-order'
+        </td>
+    </tr>
+    <tr>
+        <td><h5>partition.time-extractor.kind</h5></td>
+        <td style="word-wrap: break-word;">default</td>
+        <td>String</td>
+        <td>Time extractor to extract time from partition values. Support default and custom. For default, can configure timestamp pattern. For custom, should configure extractor class..
+        </td>
+    </tr>
+    <tr>
+        <td><h5>partition.time-extractor.class</h5></td>
+        <td style="word-wrap: break-word;">None</td>
+        <td>String</td>
+        <td>The extractor class for implement `PartitionTimeExtractor` interface.
+        </td>
+    </tr>
+    <tr>
+        <td><h5>partition.time-extractor.timestamp-pattern</h5></td>
+        <td style="word-wrap: break-word;">None</td>
+        <td>String</td>
+        <td>The 'default' construction way allows users to use partition fields to get a legal timestamp pattern. Default support 'yyyy-mm-dd hh:mm:ss' from first field. If timestamp should be extracted from a single partition field 'dt', can configure: '$dt'. If timestamp should be extracted from multiple partition fields, say 'year', 'month', 'day' and 'hour', can configure: '$year-$month-$day $hour:00:00'. If timestamp should be extracted from two partition fields 'dt' and 'hour', can configure: '$dt $hour:00:00'.
+        </td>
+    </tr>                                  
+    <tr>
         <td><h5>lookup.join.cache.ttl</h5></td>
         <td style="word-wrap: break-word;">60 min</td>
         <td>Duration</td>
-        <td>The cache TTL (e.g. 10min) for the build table in lookup join. By default the TTL is 60 minutes.</td>
+        <td>Option to set the data cache TTL in lookup join implementation. The cache will be expired after given time and then the framework will reload data from hive table. By default the TTL is 60 minutes.
+         **Note:** The option only works when lookup bounded hive table source, if you're using streaming hive source as temporal table, please use 'streaming-source.monitor-interval' to configure the interval of data update. 
+        </td>
     </tr>
   </tbody>
 </table>
 
+The following demo shows load all partitions of hive table as temporal table.
+
+{% highlight sql %}
+-- The data in hive table is updated by batch pipeline per day
+SET table.sql-dialect=hive;
+CREATE TABLE dimension_table (
+  product_id STRING,
+  product_name STRING,
+  unit_price DECIMAL(10, 4),
+  pv_count BIGINT,
+  like_count BIGINT,
+  comment_count BIGINT,
+  update_time TIMESTAMP(3),
+  update_user STRING,
+  ...
+) TBLPROPERTIES (
+  'lookup.join.cache.ttl' = '12 h'
+);
+
+
+SET table.sql-dialect=default;
+CREATE TABLE orders_table (
+  order_id STRING,
+  order_amount DOUBLE,
+  product_id STRING,
+  log_ts TIMESTAMP(3),
+  proctime as PROCTIME()
+) WITH (...);
+
+
+-- streaming sql, kafka join a hive dimension table. Flink will reload all data from dimension_table after cache ttl is expired.
+
+SELECT * FROM orders_table AS order 
+JOIN dimension_table FOR SYSTEM_TIME AS OF o.proctime AS dim
+ON order.product_id = dim.product_id;
+
+{% endhighlight %}
+
+
+In above user case, user need to an extra pipeline to insert overwrite dimension_table to ensure the temporal table contains all dimension data. Now, user can do this things smoothly with the 'streaming-source.enable' and 'streaming-source.partition.include' option.
+The following demo shows a classical business pipeline, the dimension table comes from hive and it's updated once every day by batch pipeline job or flink writing hive using dynamic partition job, the kafka stream comes from real time online business data or log and need to join with the dimension table to enrich stream. 
+
+{% highlight sql %}
+-- The data in hive table is updated per day, every day contains the latest and full dimension data
+SET table.sql-dialect=hive;
+CREATE TABLE dimension_table (
+  product_id STRING,
+  product_name STRING,
+  unit_price DECIMAL(10, 4),
+  pv_count BIGINT,
+  like_count BIGINT,
+  comment_count BIGINT,
+  update_time TIMESTAMP(3),
+  update_user STRING,
+  ...
+) PARTITIONED BY (pt_year STRING, pt_month STRING, pt_day STRING) TBLPROPERTIES (
+  -- using default partition file create-time order to load the latest partition every 12h
+  'streaming-source.enable' = 'true',
+  'streaming-source.partition.include' = 'latest',
+  'streaming-source.monitor-interval' = '12 h'
+
+  -- using partition-time order to load the latest partition every 12h
+  'streaming-source.enable' = 'true',
+  'streaming-source.partition.include' = 'latest',
+  'streaming-source.monitor-interval' = '12 h',
+  'streaming-source.partition-order' = 'partition-time',
+  'partition.time-extractor.kind' = 'default',
+  'partition.time-extractor.timestamp-pattern' = '$pt_year-$pt_month-$pt_day 00:00:00' 
+);
+
+
+SET table.sql-dialect=default;
+CREATE TABLE orders_table (
+  order_id STRING,
+  order_amount DOUBLE,
+  product_id STRING,
+  log_ts TIMESTAMP(3),
+  proctime as PROCTIME()
+) WITH (...);
+
+
+-- streaming sql, kafka join a hive dimension table. Flink will automatically reload data from the configured latest partition when
+ in the interval of 'streaming-source.monitor-interval'.
+
+SELECT * FROM orders_table AS order 
+JOIN dimension_table FOR SYSTEM_TIME AS OF o.proctime AS dim
+ON order.product_id = dim.product_id;
+
+{% endhighlight %}
+
 **Note**:
 1. Each joining subtask needs to keep its own cache of the Hive table. Please make sure the Hive table can fit into
 the memory of a TM task slot.
-2. You should set a relatively large value for `lookup.join.cache.ttl`. You'll probably have performance issue if
-your Hive table needs to be updated and reloaded too frequently.
+2. You should set a relatively large value both for `streaming-source.monitor-interval`(latest partition as temporal table) or `lookup.join.cache.ttl`(all partitions as temporal table). 
+You'll probably have performance issue if your Hive table needs to be updated and reloaded too frequently.
 3. Currently we simply load the whole Hive table whenever the cache needs refreshing. There's no way to differentiate
 new data from the old.

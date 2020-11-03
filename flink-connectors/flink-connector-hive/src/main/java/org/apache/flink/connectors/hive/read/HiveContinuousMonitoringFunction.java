@@ -25,7 +25,6 @@ import org.apache.flink.api.common.typeutils.base.StringSerializer;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.connectors.hive.ConsumeOrder;
 import org.apache.flink.connectors.hive.HiveTablePartition;
-import org.apache.flink.connectors.hive.HiveTableSource;
 import org.apache.flink.connectors.hive.JobConfWrapper;
 import org.apache.flink.runtime.state.FunctionInitializationContext;
 import org.apache.flink.runtime.state.FunctionSnapshotContext;
@@ -35,6 +34,7 @@ import org.apache.flink.streaming.api.functions.source.RichSourceFunction;
 import org.apache.flink.table.catalog.CatalogTable;
 import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.hive.client.HiveShim;
+import org.apache.flink.table.catalog.hive.util.HivePartitionUtils;
 import org.apache.flink.table.catalog.hive.util.HiveReflectionUtils;
 import org.apache.flink.table.filesystem.PartitionTimeExtractor;
 import org.apache.flink.table.types.DataType;
@@ -46,6 +46,7 @@ import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.Partition;
+import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.thrift.TException;
@@ -120,9 +121,9 @@ public class HiveContinuousMonitoringFunction
 	/** The maximum partition read time seen so far. */
 	private volatile long currentReadTime;
 
-	private transient PartitionDiscovery.Context context;
+	private transient PartitionFetcher.Context context;
 
-	private transient PartitionDiscovery fetcher;
+	private transient PartitionFetcher fetcher;
 
 	private transient Object checkpointLock;
 
@@ -195,11 +196,11 @@ public class HiveContinuousMonitoringFunction
 				extractorClass,
 				extractorPattern);
 
-		this.fetcher = new DirectoryMonitorDiscovery();
+		this.fetcher = new NewPartitionFetcher();
 
 		Path location = new Path(hiveTable.getSd().getLocation());
 		FileSystem fs = location.getFileSystem(conf.conf());
-		this.context = new PartitionDiscovery.Context() {
+		this.context = new PartitionFetcher.Context() {
 
 			@Override
 			public List<String> partitionKeys() {
@@ -229,6 +230,16 @@ public class HiveContinuousMonitoringFunction
 			}
 
 			@Override
+			public StorageDescriptor tableSd() {
+				return hiveTable.getSd();
+			}
+
+			@Override
+			public Properties tableProps() {
+				return tableProps;
+			}
+
+			@Override
 			public long extractTimestamp(
 					List<String> partKeys,
 					List<String> partValues,
@@ -242,6 +253,11 @@ public class HiveContinuousMonitoringFunction
 						throw new UnsupportedOperationException(
 								"Unsupported consumer order: " + consumeOrder);
 				}
+			}
+
+			@Override
+			public long previousTimestamp() {
+				return currentReadTime;
 			}
 		};
 
@@ -271,7 +287,7 @@ public class HiveContinuousMonitoringFunction
 			SourceContext<TimestampedHiveInputSplit> context) throws Exception {
 		assert (Thread.holdsLock(checkpointLock));
 
-		List<Tuple2<Partition, Long>> partitions = fetcher.fetchPartitions(this.context, currentReadTime);
+		List<Tuple2<Partition, Long>> partitions = fetcher.fetch(this.context);
 
 		if (partitions.isEmpty()) {
 			return;
@@ -313,7 +329,7 @@ public class HiveContinuousMonitoringFunction
 	}
 
 	private HiveTablePartition toHiveTablePartition(Partition p) {
-		return HiveTableSource.toHiveTablePartition(
+		return HivePartitionUtils.toHiveTablePartition(
 				partitionKeys, fieldNames, fieldTypes, hiveShim, tableProps, defaultPartitionName, p);
 	}
 

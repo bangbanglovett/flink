@@ -25,18 +25,20 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.metastore.api.Partition;
+import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.junit.Assert;
 import org.junit.Test;
 
 import java.sql.Timestamp;
 import java.util.List;
 import java.util.Optional;
+import java.util.Properties;
 import java.util.function.Supplier;
 
 /**
- * Test for {@link DirectoryMonitorDiscovery}.
+ * Test for {@link NewPartitionFetcher}.
  */
-public class DirectoryMonitorDiscoveryTest {
+public class NewPartitionFetcherTest {
 
 	private static FileStatus status(String time) {
 		return new FileStatus(0L, false, 0, 0L, Timestamp.valueOf(time).getTime(), 0L, null, null, null, new Path("/tmp/dummy"));
@@ -51,8 +53,8 @@ public class DirectoryMonitorDiscoveryTest {
 				status("2020-05-06 12:22:00"),
 				status("2020-05-06 12:23:00"),
 				status("2020-05-06 12:24:00")};
-		List<Tuple2<List<String>, Long>> parts = DirectoryMonitorDiscovery.suitablePartitions(
-				new PartitionDiscovery.Context() {
+		List<Tuple2<List<String>, Long>> parts = NewPartitionFetcher.suitablePartitions(
+				new PartitionFetcher.Context() {
 
 					@Override
 					public List<String> partitionKeys() {
@@ -71,6 +73,16 @@ public class DirectoryMonitorDiscoveryTest {
 
 					@Override
 					public Path tableLocation() {
+						return null;
+					}
+
+					@Override
+					public StorageDescriptor tableSd() {
+						return null;
+					}
+
+					@Override
+					public Properties tableProps() {
 						return null;
 					}
 

@@ -20,14 +20,12 @@ package org.apache.flink.connectors.hive.read;
 
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.table.catalog.hive.util.HivePartitionUtils;
 import org.apache.flink.table.data.TimestampData;
 
 import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.metastore.api.Partition;
 
-import java.io.IOException;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
@@ -35,16 +33,17 @@ import java.util.List;
 import static org.apache.flink.table.utils.PartitionPathUtils.extractPartitionValues;
 
 /**
- * Directory monitor {@link PartitionDiscovery}.
- */
-public class DirectoryMonitorDiscovery implements PartitionDiscovery {
+ * Partition fetcher that fetches new partitions by compared to previous timestamp.
+ **/
+public class NewPartitionFetcher implements PartitionFetcher<Tuple2<Partition, Long>> {
+
+	private static final long serialVersionUID = 1L;
 
 	@Override
-	public List<Tuple2<Partition, Long>> fetchPartitions(
-			Context context, long previousTimestamp) throws Exception {
-		FileStatus[] statuses = getFileStatusRecurse(
+	public List<Tuple2<Partition, Long>> fetch(Context context) throws Exception {
+		FileStatus[] statuses = HivePartitionUtils.getFileStatusRecurse(
 				context.tableLocation(), context.partitionKeys().size(), context.fileSystem());
-		List<Tuple2<List<String>, Long>> partValueList = suitablePartitions(context, previousTimestamp, statuses);
+		List<Tuple2<List<String>, Long>> partValueList = suitablePartitions(context, context.previousTimestamp(), statuses);
 
 		List<Tuple2<Partition, Long>> partitions = new ArrayList<>();
 		for (Tuple2<List<String>, Long> tuple2 : partValueList) {
@@ -77,36 +76,5 @@ public class DirectoryMonitorDiscovery implements PartitionDiscovery {
 			}
 		}
 		return partValueList;
-	}
-
-	private static FileStatus[] getFileStatusRecurse(Path path, int expectLevel, FileSystem fs) {
-		ArrayList<FileStatus> result = new ArrayList<>();
-
-		try {
-			FileStatus fileStatus = fs.getFileStatus(path);
-			listStatusRecursively(fs, fileStatus, 0, expectLevel, result);
-		} catch (IOException ignore) {
-			return new FileStatus[0];
-		}
-
-		return result.toArray(new FileStatus[0]);
-	}
-
-	private static void listStatusRecursively(
-			FileSystem fs,
-			FileStatus fileStatus,
-			int level,
-			int expectLevel,
-			List<FileStatus> results) throws IOException {
-		if (expectLevel == level) {
-			results.add(fileStatus);
-			return;
-		}
-
-		if (fileStatus.isDir()) {
-			for (FileStatus stat : fs.listStatus(fileStatus.getPath())) {
-				listStatusRecursively(fs, stat, level + 1, expectLevel, results);
-			}
-		}
 	}
 }

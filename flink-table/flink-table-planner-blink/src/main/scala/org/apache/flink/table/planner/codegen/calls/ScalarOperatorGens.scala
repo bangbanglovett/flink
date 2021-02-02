@@ -18,6 +18,7 @@
 
 package org.apache.flink.table.planner.codegen.calls
 
+import org.apache.flink.table.api.config.ExecutionConfigOptions.TABLE_EXEC_FALLBACK_LEGACY_TIME_FUNCTION
 import org.apache.flink.table.api.ValidationException
 import org.apache.flink.table.data.binary.BinaryArrayData
 import org.apache.flink.table.data.util.{DataFormatConverters, MapDataUtil}
@@ -1115,13 +1116,6 @@ object ScalarOperatorGens {
         operandTerm => s"$DECIMAL_UTIL.castToBoolean($operandTerm)"
       }
 
-    // DECIMAL -> Timestamp
-    case (DECIMAL, TIMESTAMP_WITHOUT_TIME_ZONE) =>
-      generateUnaryOperatorIfNotNull(ctx, targetType, operand) {
-        operandTerm =>
-          s"$TIMESTAMP_DATA.fromEpochMillis($DECIMAL_UTIL.castToTimestamp($operandTerm))"
-      }
-
     // NUMERIC TYPE -> Boolean
     case (_, BOOLEAN) if isNumeric(operand.resultType) =>
       generateUnaryOperatorIfNotNull(ctx, targetType, operand) {
@@ -1203,18 +1197,6 @@ object ScalarOperatorGens {
         s"$method($operandTerm.getMillisecond(), $zone)"
       }
 
-    // Timestamp -> Decimal
-    case  (TIMESTAMP_WITHOUT_TIME_ZONE, DECIMAL) =>
-      val dt = targetType.asInstanceOf[DecimalType]
-      generateUnaryOperatorIfNotNull(ctx, targetType, operand) {
-        operandTerm =>
-          s"""
-             |$DECIMAL_UTIL.castFrom(
-             |  ((double) ($operandTerm.getMillisecond() / 1000.0)),
-             |  ${dt.getPrecision}, ${dt.getScale})
-           """.stripMargin
-      }
-
     // Tinyint -> Timestamp
     // Smallint -> Timestamp
     // Int -> Timestamp
@@ -1223,7 +1205,7 @@ object ScalarOperatorGens {
          (SMALLINT, TIMESTAMP_WITHOUT_TIME_ZONE) |
          (INTEGER, TIMESTAMP_WITHOUT_TIME_ZONE) |
          (BIGINT, TIMESTAMP_WITHOUT_TIME_ZONE) =>
-      generateUnaryOperatorIfNotNull(ctx, targetType, operand) {
+      generateCastBetweenTimestampAndNumeric(ctx, targetType, operand) {
         operandTerm => s"$TIMESTAMP_DATA.fromEpochMillis(((long) $operandTerm) * 1000)"
       }
 
@@ -1231,25 +1213,32 @@ object ScalarOperatorGens {
     // Double -> Timestamp
     case (FLOAT, TIMESTAMP_WITHOUT_TIME_ZONE) |
          (DOUBLE, TIMESTAMP_WITHOUT_TIME_ZONE) =>
-      generateUnaryOperatorIfNotNull(ctx, targetType, operand) {
+      generateCastBetweenTimestampAndNumeric(ctx, targetType, operand) {
         operandTerm => s"$TIMESTAMP_DATA.fromEpochMillis((long) ($operandTerm * 1000))"
+      }
+
+    // DECIMAL -> Timestamp
+    case (DECIMAL, TIMESTAMP_WITHOUT_TIME_ZONE) =>
+      generateCastBetweenTimestampAndNumeric(ctx, targetType, operand) {
+        operandTerm =>
+          s"$TIMESTAMP_DATA.fromEpochMillis($DECIMAL_UTIL.castToTimestamp($operandTerm))"
       }
 
     // Timestamp -> Tinyint
     case (TIMESTAMP_WITHOUT_TIME_ZONE, TINYINT) =>
-      generateUnaryOperatorIfNotNull(ctx, targetType, operand) {
+      generateCastBetweenTimestampAndNumeric(ctx, targetType, operand) {
         operandTerm => s"((byte) ($operandTerm.getMillisecond() / 1000))"
       }
 
     // Timestamp -> Smallint
     case (TIMESTAMP_WITHOUT_TIME_ZONE, SMALLINT) =>
-      generateUnaryOperatorIfNotNull(ctx, targetType, operand) {
+      generateCastBetweenTimestampAndNumeric(ctx, targetType, operand) {
         operandTerm => s"((short) ($operandTerm.getMillisecond() / 1000))"
       }
 
     // Timestamp -> Int
     case (TIMESTAMP_WITHOUT_TIME_ZONE, INTEGER) =>
-      generateUnaryOperatorIfNotNull(ctx, targetType, operand) {
+      generateCastBetweenTimestampAndNumeric(ctx, targetType, operand) {
         operandTerm => s"((int) ($operandTerm.getMillisecond() / 1000))"
       }
 
@@ -1261,14 +1250,26 @@ object ScalarOperatorGens {
 
     // Timestamp -> Float
     case (TIMESTAMP_WITHOUT_TIME_ZONE, FLOAT) =>
-      generateUnaryOperatorIfNotNull(ctx, targetType, operand) {
+      generateCastBetweenTimestampAndNumeric(ctx, targetType, operand) {
         operandTerm => s"((float) ($operandTerm.getMillisecond() / 1000.0))"
       }
 
     // Timestamp -> Double
     case (TIMESTAMP_WITHOUT_TIME_ZONE, DOUBLE) =>
-      generateUnaryOperatorIfNotNull(ctx, targetType, operand) {
+      generateCastBetweenTimestampAndNumeric(ctx, targetType, operand) {
         operandTerm => s"((double) ($operandTerm.getMillisecond() / 1000.0))"
+      }
+
+    // Timestamp -> Decimal
+    case  (TIMESTAMP_WITHOUT_TIME_ZONE, DECIMAL) =>
+      val dt = targetType.asInstanceOf[DecimalType]
+      generateCastBetweenTimestampAndNumeric(ctx, targetType, operand) {
+        operandTerm =>
+          s"""
+             |$DECIMAL_UTIL.castFrom(
+             |  ((double) ($operandTerm.getMillisecond() / 1000.0)),
+             |  ${dt.getPrecision}, ${dt.getScale})
+           """.stripMargin
       }
 
     // internal temporal casting
@@ -1302,6 +1303,35 @@ object ScalarOperatorGens {
 
     case (_, _) =>
       throw new CodeGenException(s"Unsupported cast from '${operand.resultType}' to '$targetType'.")
+  }
+
+  private def generateCastBetweenTimestampAndNumeric(
+      ctx: CodeGeneratorContext,
+      targetType: LogicalType,
+      operand: GeneratedExpression,
+      resultNullable: Boolean = false)
+      (expr: String => String): GeneratedExpression = {
+    val fallbackLegacyBehavior = ctx.tableConfig
+      .getConfiguration.getBoolean(TABLE_EXEC_FALLBACK_LEGACY_TIME_FUNCTION)
+    if (fallbackLegacyBehavior) {
+      generateUnaryOperatorIfNotNull(ctx, targetType, operand) {
+        args => expr(args)
+      }
+    } else {
+      if (TIMESTAMP_WITHOUT_TIME_ZONE.equals(targetType.getTypeRoot)) {
+        throw new ValidationException("The cast conversion from NUMERIC type to TIMESTAMP type" +
+          " is problematic and has been disabled since Flink 1.13.0, it's recommended to use" +
+          " TO_TIMESTAMP(FROM_UNIXTIME(epochSeconds)) as an replacement. You can also fallback" +
+          " the problematic cast conversion by setting '" +
+          TABLE_EXEC_FALLBACK_LEGACY_TIME_FUNCTION.key + "' option to 'true'.")
+      } else {
+        throw new ValidationException("The cast conversion from TIMESTAMP type to NUMERIC type" +
+          " is problematic and has been disabled since Flink 1.13.0, it's recommended to use" +
+          " UNIX_TIMESTAMP() as an replacement. You can also fallback" +
+          " the problematic cast conversion by setting '" +
+          TABLE_EXEC_FALLBACK_LEGACY_TIME_FUNCTION.key + "' option to 'true'.")
+      }
+    }
   }
 
   def generateIfElse(

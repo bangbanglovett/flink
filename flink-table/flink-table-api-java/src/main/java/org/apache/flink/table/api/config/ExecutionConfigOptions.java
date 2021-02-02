@@ -306,6 +306,28 @@ public class ExecutionConfigOptions {
                                     + " is set true, its value must be positive.");
 
     // ------------------------------------------------------------------------
+    //  Function Options
+    // ------------------------------------------------------------------------
+    //TODO what the option described will be supported until FLIP-162 fininshed.
+    @Documentation.TableOption(execMode = Documentation.ExecMode.BATCH_STREAMING)
+    public static final ConfigOption<Boolean> TABLE_EXEC_FALLBACK_LEGACY_TIME_FUNCTION =
+            key("table.exec.fallback-legacy-time-function")
+                    .defaultValue(false)
+                    .withDescription(
+                            "Fallback to legacy time function behavior or not, \n"
+                                    + "the the option value is 'false' by default, \n"
+                                    + "(1) the return values of function CURRENT_DATE/CURRENT_TIME/CURRENT_TIMESTAMP/NOW()/PROCTIME() consider the "
+                                    + "local timezone and the return type of PROCTIME()/NOW()/CURRENT_TIMESTAMP is TIMESTAMP WITH LOCAL TIME ZONE, \n"
+                                    + "the return type of CURRENT_DATE is DATE, the return type of CURRENT_TIME is TIME;\n"
+                                    + "(2) the cast conversion between NUMERIC and TIMESTAMP is forbidden.\n"
+                                    + "When the option is set to 'false', \n"
+                                    + "(1) the return values of function CURRENT_DATE/CURRENT_TIME/CURRENT_TIMESTAMP/NOW()/PROCTIME() do not consider"
+                                    + " the local timezone and the return type of PROCTIME()/NOW()/CURRENT_TIMESTAMP is TIMESTAMP, the return type of"
+                                    + " CURRENT_DATE is DATE, \n"
+                                    + "the return type of CURRENT_TIME is TIME, and this time function value is evaluated based on UTC+0 timezone, \n"
+                                    + "(2) the cast conversion between NUMERIC and TIMESTAMP is supported.");
+
+    // ------------------------------------------------------------------------
     //  Other Exec Options
     // ------------------------------------------------------------------------
     @Documentation.TableOption(execMode = Documentation.ExecMode.BATCH)

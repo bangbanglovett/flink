@@ -202,7 +202,7 @@ object ScalarOperatorGens {
           (l, r) => s"$l"
         }
 
-      case (TIMESTAMP_WITHOUT_TIME_ZONE, INTERVAL_DAY_TIME) =>
+      case (TIMESTAMP_WITHOUT_TIME_ZONE | TIMESTAMP_WITH_LOCAL_TIME_ZONE, INTERVAL_DAY_TIME) =>
         generateOperatorIfNotNull(ctx, left.resultType, left, right) {
           (l, r) => {
             val leftTerm = s"$l.getMillisecond()"
@@ -211,7 +211,7 @@ object ScalarOperatorGens {
           }
         }
 
-      case (TIMESTAMP_WITHOUT_TIME_ZONE, INTERVAL_YEAR_MONTH) =>
+      case (TIMESTAMP_WITHOUT_TIME_ZONE | TIMESTAMP_WITH_LOCAL_TIME_ZONE, INTERVAL_YEAR_MONTH) =>
         generateOperatorIfNotNull(ctx, left.resultType, left, right) {
           (l, r) => {
             val leftTerm = s"$l.getMillisecond()"
@@ -225,28 +225,29 @@ object ScalarOperatorGens {
         }
 
       // minus arithmetic of time points (i.e. for TIMESTAMPDIFF)
-      case (TIMESTAMP_WITHOUT_TIME_ZONE | TIME_WITHOUT_TIME_ZONE | DATE,
-      TIMESTAMP_WITHOUT_TIME_ZONE | TIME_WITHOUT_TIME_ZONE | DATE) if !plus =>
+      case (TIMESTAMP_WITHOUT_TIME_ZONE | TIMESTAMP_WITH_LOCAL_TIME_ZONE | TIME_WITHOUT_TIME_ZONE | DATE,
+      TIMESTAMP_WITHOUT_TIME_ZONE | TIMESTAMP_WITH_LOCAL_TIME_ZONE | TIME_WITHOUT_TIME_ZONE | DATE) if !plus =>
         resultType.getTypeRoot match {
           case INTERVAL_YEAR_MONTH =>
             generateOperatorIfNotNull(ctx, resultType, left, right) {
               (ll, rr) => (left.resultType.getTypeRoot, right.resultType.getTypeRoot) match {
-                case (TIMESTAMP_WITHOUT_TIME_ZONE, DATE) =>
+                case (TIMESTAMP_WITHOUT_TIME_ZONE | TIMESTAMP_WITH_LOCAL_TIME_ZONE, DATE) =>
                   val leftTerm = s"$ll.getMillisecond()"
                   s"${qualifyMethod(BuiltInMethods.SUBTRACT_MONTHS)}" +
                     s"($leftTerm, $rr * ${MILLIS_PER_DAY}L)"
-                case (DATE, TIMESTAMP_WITHOUT_TIME_ZONE) =>
+                case (DATE, TIMESTAMP_WITHOUT_TIME_ZONE | TIMESTAMP_WITH_LOCAL_TIME_ZONE) =>
                   val rightTerm = s"$rr.getMillisecond()"
                   s"${qualifyMethod(BuiltInMethods.SUBTRACT_MONTHS)}" +
                     s"($ll * ${MILLIS_PER_DAY}L, $rightTerm)"
-                case (TIMESTAMP_WITHOUT_TIME_ZONE, TIMESTAMP_WITHOUT_TIME_ZONE) =>
+                case (TIMESTAMP_WITHOUT_TIME_ZONE | TIMESTAMP_WITH_LOCAL_TIME_ZONE,
+                TIMESTAMP_WITHOUT_TIME_ZONE | TIMESTAMP_WITH_LOCAL_TIME_ZONE) =>
                   val leftTerm = s"$ll.getMillisecond()"
                   val rightTerm = s"$rr.getMillisecond()"
                   s"${qualifyMethod(BuiltInMethods.SUBTRACT_MONTHS)}($leftTerm, $rightTerm)"
-                case (TIMESTAMP_WITHOUT_TIME_ZONE, _) =>
+                case (TIMESTAMP_WITHOUT_TIME_ZONE | TIMESTAMP_WITH_LOCAL_TIME_ZONE, _) =>
                   val leftTerm = s"$ll.getMillisecond()"
                   s"${qualifyMethod(BuiltInMethods.SUBTRACT_MONTHS)}($leftTerm, $rr)"
-                case (_, TIMESTAMP_WITHOUT_TIME_ZONE) =>
+                case (_, TIMESTAMP_WITHOUT_TIME_ZONE | TIMESTAMP_WITH_LOCAL_TIME_ZONE) =>
                   val rightTerm = s"$rr.getMillisecond()"
                   s"${qualifyMethod(BuiltInMethods.SUBTRACT_MONTHS)}($ll, $rightTerm)"
                 case _ =>
@@ -257,16 +258,17 @@ object ScalarOperatorGens {
           case INTERVAL_DAY_TIME =>
             generateOperatorIfNotNull(ctx, resultType, left, right) {
               (ll, rr) => (left.resultType.getTypeRoot, right.resultType.getTypeRoot) match {
-                case (TIMESTAMP_WITHOUT_TIME_ZONE, TIMESTAMP_WITHOUT_TIME_ZONE) =>
+                case (TIMESTAMP_WITHOUT_TIME_ZONE | TIMESTAMP_WITH_LOCAL_TIME_ZONE,
+                TIMESTAMP_WITHOUT_TIME_ZONE | TIMESTAMP_WITH_LOCAL_TIME_ZONE) =>
                   val leftTerm = s"$ll.getMillisecond()"
                   val rightTerm = s"$rr.getMillisecond()"
                   s"$leftTerm $op $rightTerm"
                 case (DATE, DATE) =>
                   s"($ll * ${MILLIS_PER_DAY}L) $op ($rr * ${MILLIS_PER_DAY}L)"
-                case (TIMESTAMP_WITHOUT_TIME_ZONE, DATE) =>
+                case (TIMESTAMP_WITHOUT_TIME_ZONE | TIMESTAMP_WITH_LOCAL_TIME_ZONE, DATE) =>
                   val leftTerm = s"$ll.getMillisecond()"
                   s"$leftTerm $op ($rr * ${MILLIS_PER_DAY}L)"
-                case (DATE, TIMESTAMP_WITHOUT_TIME_ZONE) =>
+                case (DATE, TIMESTAMP_WITHOUT_TIME_ZONE | TIMESTAMP_WITH_LOCAL_TIME_ZONE) =>
                   val rightTerm = s"$rr.getMillisecond()"
                   s"($ll * ${MILLIS_PER_DAY}L) $op $rightTerm"
               }

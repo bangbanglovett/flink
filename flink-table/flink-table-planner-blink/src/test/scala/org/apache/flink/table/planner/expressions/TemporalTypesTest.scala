@@ -771,7 +771,7 @@ class TemporalTypesTest extends ExpressionTestBase {
   }
 
   private def timestampLtz(str: String, precision: Int): String = {
-    s"CAST(TIMESTAMP '$str' AS TIMESTAMP($precision) WITH LOCAL TIME ZONE)"
+    s"CAST(TIMESTAMP '$str' AS TIMESTAMP_LTZ($precision))"
   }
 
   // According to SQL standard, the length of second fraction is
@@ -1189,7 +1189,6 @@ class TemporalTypesTest extends ExpressionTestBase {
       "TIMESTAMP '1970-01-01 00:00:00.123456788' < TIMESTAMP '1970-01-01 00:00:00.123456789'",
       "true")
 
-
     testSqlApi(
       s"${timestampLtz("1970-01-01 00:00:00.123456789", 9)} > " +
         s"${timestampLtz("1970-01-01 00:00:00.123456788", 9)}",
@@ -1200,7 +1199,6 @@ class TemporalTypesTest extends ExpressionTestBase {
         s"${timestampLtz("1970-01-01 00:00:00.123456789", 9)}",
       "true")
 
-
     // DATE_FORMAT() should support nanosecond
     testSqlApi(
       "DATE_FORMAT(TIMESTAMP '1970-01-01 00:00:00.123456789', 'yyyy/MM/dd HH:mm:ss.SSSSSSSSS')",
@@ -1210,7 +1208,65 @@ class TemporalTypesTest extends ExpressionTestBase {
       s"DATE_FORMAT(${timestampLtz("2018-03-14 01:02:03.123456789", 9)}, " +
         "'yyyy-MM-dd HH:mm:ss.SSSSSSSSS')",
       "2018-03-14 01:02:03.123456789")
+  }
 
+  @Test
+  def testTimestampLtzArithmetic(): Unit = {
+    // TIMESTAMP_LTZ +/- INTERVAL should support nanosecond
+    testSqlApi(
+      s"${timestampLtz("1970-02-01 00:00:00.123456789")} + INTERVAL '1' YEAR",
+      "1971-02-01 00:00:00.123456789")
+
+    testSqlApi(
+      s"${timestampLtz("1970-02-01 00:00:00.123456789")} - INTERVAL '1' MONTH",
+      "1970-01-01 00:00:00.123456789")
+
+    testSqlApi(
+      s"${timestampLtz("1970-02-01 00:00:00.123456789")} + INTERVAL '1' DAY",
+      "1970-02-02 00:00:00.123456789")
+
+    testSqlApi(
+      s"${timestampLtz("1970-02-01 00:00:00.123456789")} - INTERVAL '1' HOUR",
+      "1970-01-31 23:00:00.123456789")
+
+    testSqlApi(
+      s"${timestampLtz("1970-02-01 00:00:00.123456789")} + INTERVAL '1' MINUTE",
+      "1970-02-01 00:01:00.123456789")
+
+    testSqlApi(
+      s"${timestampLtz("1970-02-01 00:00:00.123456789")} - INTERVAL '1' SECOND",
+      "1970-01-31 23:59:59.123456789")
+
+    //  TIMESTAMPDIFF function should support TIMESTAMP_LTZ
+    testSqlApi(
+      s"TIMESTAMPDIFF(YEAR, ${timestampLtz("1970-01-01 00:00:00.123456789")}," +
+        s" ${timestampLtz("1971-01-02 01:02:03.123456789")})",
+      "1")
+
+    testSqlApi(
+      s"TIMESTAMPDIFF(MONTH, ${timestampLtz("1970-01-01 00:00:00.123456789")}," +
+        s" ${timestampLtz("1971-01-02 01:02:03.123456789")})",
+      "12")
+
+    testSqlApi(
+      s"TIMESTAMPDIFF(DAY, ${timestampLtz("1970-01-01 00:00:00.123")}," +
+        s" ${timestampLtz("1971-01-02 01:02:03.123")})",
+      "366")
+
+    testSqlApi(
+      s"TIMESTAMPDIFF(HOUR, ${timestampLtz("1970-01-01 00:00:00.123")}," +
+        s" ${timestampLtz("1970-01-01 01:02:03.123")})",
+      "1")
+
+    testSqlApi(
+      s"TIMESTAMPDIFF(MINUTE, ${timestampLtz("1970-01-01 01:02:03.123")}," +
+        s" ${timestampLtz("1970-01-01 00:00:00")})",
+      "-62")
+
+    testSqlApi(
+      s"TIMESTAMPDIFF(SECOND, ${timestampLtz("1970-01-01 00:00:00.123")}," +
+        s" ${timestampLtz("1970-01-01 00:02:03.123")})",
+      "123")
   }
 
   @Test

@@ -72,6 +72,28 @@ public class TypeCheckUtils {
         }
     }
 
+    public static boolean isIntegralNumeric(LogicalType type) {
+        switch (type.getTypeRoot()) {
+            case TINYINT:
+            case SMALLINT:
+            case INTEGER:
+            case BIGINT:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    public static boolean isFractionalNumeric(LogicalType type) {
+        switch (type.getTypeRoot()) {
+            case FLOAT:
+            case DOUBLE:
+                return true;
+            default:
+                return false;
+        }
+    }
+
     public static boolean isCharacterString(LogicalType type) {
         return type.getTypeRoot().getFamilies().contains(LogicalTypeFamily.CHARACTER_STRING);
     }

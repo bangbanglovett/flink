@@ -108,95 +108,99 @@ abstract class ExpressionTestBase {
 
   @After
   def evaluateExprs(): Unit = {
-    val ctx = CodeGeneratorContext(config)
-    val inputType = if (containsLegacyTypes) {
-      fromTypeInfoToLogicalType(typeInfo)
-    } else {
-      resolvedDataType.getLogicalType
-    }
-    val exprGenerator = new ExprCodeGenerator(ctx, nullableInput = false).bindInput(inputType)
-
-    // cast expressions to String
-    val stringTestExprs = testExprs.map(expr => relBuilder.cast(expr._2, VARCHAR))
-
-    // generate code
-    val resultType = RowType.of(Seq.fill(testExprs.size)(
-      new VarCharType(VarCharType.MAX_LENGTH)): _*)
-
-    val exprs = stringTestExprs.map(exprGenerator.generateExpression)
-    val genExpr = exprGenerator.generateResultExpression(exprs, resultType, classOf[BinaryRowData])
-
-    val bodyCode =
-      s"""
-         |${genExpr.code}
-         |return ${genExpr.resultTerm};
-        """.stripMargin
-
-    val genFunc = FunctionCodeGenerator.generateFunction[MapFunction[RowData, BinaryRowData]](
-      ctx,
-      "TestFunction",
-      classOf[MapFunction[RowData, BinaryRowData]],
-      bodyCode,
-      resultType,
-      inputType)
-
-    val mapper = genFunc.newInstance(getClass.getClassLoader)
-
-    val isRichFunction = mapper.isInstanceOf[RichFunction]
-
-    // call setRuntimeContext method and open method for RichFunction
-    if (isRichFunction) {
-      val richMapper = mapper.asInstanceOf[RichMapFunction[_, _]]
-      val t = new RuntimeUDFContext(
-        new TaskInfo("ExpressionTest", 1, 0, 1, 1),
-        classOf[ExpressionTestBase].getClassLoader,
-        env.getConfig,
-        Collections.emptyMap(),
-        Collections.emptyMap(),
-        null)
-      richMapper.setRuntimeContext(t)
-      richMapper.open(new Configuration())
-    }
-
-    val testRow = if (containsLegacyTypes) {
-      val converter = DataFormatConverters
-        .getConverterForDataType(resolvedDataType)
-        .asInstanceOf[DataFormatConverter[RowData, Row]]
-      converter.toInternal(testData)
-    } else {
-      val converter = DataStructureConverters
-        .getConverter(resolvedDataType)
-        .asInstanceOf[DataStructureConverter[RowData, Row]]
-      converter.toInternalOrNull(testData)
-    }
-
-    val result = mapper.map(testRow)
-
-    // call close method for RichFunction
-    if (isRichFunction) {
-      mapper.asInstanceOf[RichMapFunction[_, _]].close()
-    }
-
-    // compare
-    testExprs
-      .zipWithIndex
-      .foreach {
-        case ((originalExpr, optimizedExpr, expected), index) =>
-
-          // adapt string result
-          val actual = if(!result.asInstanceOf[BinaryRowData].isNullAt(index)) {
-            result.asInstanceOf[BinaryRowData].getString(index).toString
-          } else {
-            null
-          }
-
-          val original = if (originalExpr == null) "" else s"for: [$originalExpr]"
-
-          assertEquals(
-            s"Wrong result $original optimized to: [$optimizedExpr]",
-            expected,
-            if (actual == null) "null" else actual)
+    try {
+      val ctx = CodeGeneratorContext(config)
+      val inputType = if (containsLegacyTypes) {
+        fromTypeInfoToLogicalType(typeInfo)
+      } else {
+        resolvedDataType.getLogicalType
       }
+      val exprGenerator = new ExprCodeGenerator(ctx, nullableInput = false).bindInput(inputType)
+
+      // cast expressions to String
+      val stringTestExprs = testExprs.map(expr => relBuilder.cast(expr._2, VARCHAR))
+
+      // generate code
+      val resultType = RowType.of(Seq.fill(testExprs.size)(
+        new VarCharType(VarCharType.MAX_LENGTH)): _*)
+
+      val exprs = stringTestExprs.map(exprGenerator.generateExpression)
+      val genExpr = exprGenerator.generateResultExpression(exprs, resultType, classOf[BinaryRowData])
+
+      val bodyCode =
+        s"""
+           |${genExpr.code}
+           |return ${genExpr.resultTerm};
+          """.stripMargin
+
+      val genFunc = FunctionCodeGenerator.generateFunction[MapFunction[RowData, BinaryRowData]](
+        ctx,
+        "TestFunction",
+        classOf[MapFunction[RowData, BinaryRowData]],
+        bodyCode,
+        resultType,
+        inputType)
+
+      val mapper = genFunc.newInstance(getClass.getClassLoader)
+
+      val isRichFunction = mapper.isInstanceOf[RichFunction]
+
+      // call setRuntimeContext method and open method for RichFunction
+      if (isRichFunction) {
+        val richMapper = mapper.asInstanceOf[RichMapFunction[_, _]]
+        val t = new RuntimeUDFContext(
+          new TaskInfo("ExpressionTest", 1, 0, 1, 1),
+          classOf[ExpressionTestBase].getClassLoader,
+          env.getConfig,
+          Collections.emptyMap(),
+          Collections.emptyMap(),
+          null)
+        richMapper.setRuntimeContext(t)
+        richMapper.open(new Configuration())
+      }
+
+      val testRow = if (containsLegacyTypes) {
+        val converter = DataFormatConverters
+          .getConverterForDataType(resolvedDataType)
+          .asInstanceOf[DataFormatConverter[RowData, Row]]
+        converter.toInternal(testData)
+      } else {
+        val converter = DataStructureConverters
+          .getConverter(resolvedDataType)
+          .asInstanceOf[DataStructureConverter[RowData, Row]]
+        converter.toInternalOrNull(testData)
+      }
+
+      val result = mapper.map(testRow)
+
+      // call close method for RichFunction
+      if (isRichFunction) {
+        mapper.asInstanceOf[RichMapFunction[_, _]].close()
+      }
+
+      // compare
+      testExprs
+        .zipWithIndex
+        .foreach {
+          case ((originalExpr, optimizedExpr, expected), index) =>
+
+            // adapt string result
+            val actual = if(!result.asInstanceOf[BinaryRowData].isNullAt(index)) {
+              result.asInstanceOf[BinaryRowData].getString(index).toString
+            } else {
+              null
+            }
+
+            val original = if (originalExpr == null) "" else s"for: [$originalExpr]"
+
+            assertEquals(
+              s"Wrong result $original optimized to: [$optimizedExpr]",
+              expected,
+              if (actual == null) "null" else actual)
+        }
+    } finally {
+      testExprs.clear()
+    }
   }
 
   private def addSqlTestExpr(sqlExpr: String, expected: String): Unit = {

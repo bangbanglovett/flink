@@ -18,6 +18,7 @@
 package org.apache.flink.table.runtime.functions;
 
 import org.apache.flink.table.api.TableException;
+import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.data.DecimalData;
 import org.apache.flink.table.data.DecimalDataUtils;
 import org.apache.flink.table.data.TimestampData;
@@ -230,8 +231,61 @@ public class SqlDateTimeUtils {
     }
 
     // --------------------------------------------------------------------------------------------
-    // String --> String/timestamp conversion
+    // TO_TIMESTAMP_LTZ(numeric, precision) function supports precision 0 and precision 3.
     // --------------------------------------------------------------------------------------------
+    public static TimestampData toTimestampData(long v) {
+        return toTimestampData(v, 0);
+    }
+
+    public static TimestampData toTimestampData(long v, int precision) {
+        switch (precision) {
+            case 0:
+                return TimestampData.fromEpochMillis(v * MILLIS_PER_SECOND);
+            case 3:
+                return TimestampData.fromEpochMillis(v);
+            default:
+                throw new ValidationException(
+                    "The precision value '" + precision + "' for function " +
+                        "TO_TIMESTAMP_LTZ(numeric, precision) is unsupported," +
+                        " the supported value is '0' for second or '3' for millisecond.");
+        }
+    }
+
+    public static TimestampData toTimestampData(double v) {
+        return toTimestampData(v, 0);
+    }
+
+    public static TimestampData toTimestampData(double v, int precision) {
+        switch (precision) {
+            case 0:
+                return TimestampData.fromEpochMillis((long) v * MILLIS_PER_SECOND);
+            case 3:
+                return TimestampData.fromEpochMillis((long) v);
+            default:
+                throw new ValidationException(
+                    "The precision value '" + precision + "' for function " +
+                        "TO_TIMESTAMP_LTZ(numeric, precision) is unsupported," +
+                        " the supported value is '0' for second or '3' for millisecond.");
+        }
+    }
+
+    public static TimestampData toTimestampData(DecimalData v) {
+        return toTimestampData(v, 0);
+    }
+
+    public static TimestampData toTimestampData(DecimalData v, int precision) {
+        switch (precision) {
+            case 0:
+                return TimestampData.fromEpochMillis(DecimalDataUtils.castToLong(v) * MILLIS_PER_SECOND);
+            case 3:
+                return TimestampData.fromEpochMillis(DecimalDataUtils.castToLong(v));
+            default:
+                throw new ValidationException(
+                    "The precision value '" + precision + "' for function " +
+                        "TO_TIMESTAMP_LTZ(numeric, precision) is unsupported," +
+                        " the supported value is '0' for second or '3' for millisecond.");
+        }
+    }
 
     // --------------------------------------------------------------------------------------------
     // String --> Timestamp conversion

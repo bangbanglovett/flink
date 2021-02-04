@@ -171,6 +171,7 @@ public class DirectConvertRule implements CallExpressionConvertRule {
         DEFINITION_OPERATOR_MAP.put(
                 BuiltInFunctionDefinitions.CURRENT_TIMESTAMP,
                 FlinkSqlOperatorTable.CURRENT_TIMESTAMP);
+        DEFINITION_OPERATOR_MAP.put(BuiltInFunctionDefinitions.NOW, FlinkSqlOperatorTable.NOW);
         DEFINITION_OPERATOR_MAP.put(
                 BuiltInFunctionDefinitions.LOCAL_TIME, FlinkSqlOperatorTable.LOCALTIME);
         DEFINITION_OPERATOR_MAP.put(

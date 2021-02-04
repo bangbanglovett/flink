@@ -304,4 +304,25 @@ abstract class ExpressionTestBase {
     addTableApiTestExpr(expr, expected)
     addTableApiTestExpr(exprString, expected)
   }
+
+  //Utils to construct a TIMESTAMP_LTZ type data
+  def timestampLtz(str: String): String = {
+    val precision = extractPrecision(str)
+    timestampLtz(str, precision)
+  }
+
+  def timestampLtz(str: String, precision: Int): String = {
+    s"CAST(TIMESTAMP '$str' AS TIMESTAMP_LTZ($precision))"
+  }
+
+  // According to SQL standard, the length of second fraction is
+  // the precision of the Timestamp literal
+  private def extractPrecision(str: String): Int = {
+    val dot = str.indexOf('.')
+    if (dot == -1) {
+      0
+    } else {
+      str.length - dot - 1
+    }
+  }
 }

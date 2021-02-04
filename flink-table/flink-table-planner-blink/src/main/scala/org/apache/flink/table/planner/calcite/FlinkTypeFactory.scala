@@ -32,7 +32,7 @@ import org.apache.calcite.sql.parser.SqlParserPos
 import org.apache.calcite.util.ConversionUtil
 import org.apache.flink.api.common.typeinfo.{BasicTypeInfo, NothingTypeInfo, TypeInformation}
 import org.apache.flink.api.java.typeutils.TypeExtractor
-import org.apache.flink.table.api.{DataTypes, TableException, TableSchema, ValidationException}
+import org.apache.flink.table.api.{DataTypes, TableConfig, TableException, TableSchema, ValidationException}
 import org.apache.flink.table.calcite.ExtendedRelTypeFactory
 import org.apache.flink.table.planner.calcite.FlinkTypeFactory.toLogicalType
 import org.apache.flink.table.planner.plan.schema.{GenericRelDataType, _}
@@ -51,11 +51,16 @@ import scala.collection.mutable
   * Flink specific type factory that represents the interface between Flink's [[LogicalType]]
   * and Calcite's [[RelDataType]].
   */
-class FlinkTypeFactory(typeSystem: RelDataTypeSystem)
+class FlinkTypeFactory(typeSystem: RelDataTypeSystem, config: TableConfig = new TableConfig)
   extends JavaTypeFactoryImpl(typeSystem)
   with ExtendedRelTypeFactory {
 
   private val seenTypes = mutable.HashMap[LogicalType, RelDataType]()
+
+  /**
+   * Returns the TableConfig object.
+   */
+  def getConfig(): TableConfig = config
 
   /**
     * Create a calcite field type in table schema from [[LogicalType]]. It use

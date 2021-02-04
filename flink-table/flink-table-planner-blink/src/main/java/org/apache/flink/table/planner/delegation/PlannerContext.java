@@ -86,7 +86,7 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
 public class PlannerContext {
 
     private final RelDataTypeSystem typeSystem = new FlinkTypeSystem();
-    private final FlinkTypeFactory typeFactory = new FlinkTypeFactory(typeSystem);
+    private final FlinkTypeFactory typeFactory;
     private final TableConfig tableConfig;
     private final RelOptCluster cluster;
     private final FlinkContext context;
@@ -101,7 +101,7 @@ public class PlannerContext {
             CalciteSchema rootSchema,
             List<RelTraitDef> traitDefs) {
         this.tableConfig = tableConfig;
-
+        this.typeFactory = new FlinkTypeFactory(typeSystem, tableConfig);
         this.context =
                 new FlinkContextImpl(
                         tableConfig,

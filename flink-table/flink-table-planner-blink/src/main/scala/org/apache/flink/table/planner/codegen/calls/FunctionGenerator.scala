@@ -18,6 +18,8 @@
 
 package org.apache.flink.table.planner.codegen.calls
 
+import org.apache.flink.table.api.TableConfig
+import org.apache.flink.table.api.config.ExecutionConfigOptions.TABLE_EXEC_FALLBACK_LEGACY_TIME_FUNCTION
 import org.apache.flink.table.planner.functions.sql.FlinkSqlOperatorTable._
 import org.apache.flink.table.runtime.types.PlannerTypeUtils.isPrimitive
 import org.apache.flink.table.types.logical.LogicalTypeRoot._
@@ -30,7 +32,7 @@ import java.lang.reflect.Method
 
 import scala.collection.mutable
 
-object FunctionGenerator {
+class FunctionGenerator private(config: TableConfig) {
 
   val INTEGRAL_TYPES = Array(
     TINYINT,
@@ -480,25 +482,26 @@ object FunctionGenerator {
       BuiltInMethod.CEIL.method,
       Some(BuiltInMethods.TIMESTAMP_CEIL_TIME_ZONE)))
 
+  val fallbackLegacyImpl = config.getConfiguration.getBoolean(TABLE_EXEC_FALLBACK_LEGACY_TIME_FUNCTION)
   addSqlFunction(
     CURRENT_DATE,
     Seq(),
-    new CurrentTimePointCallGen(false))
+    new CurrentTimePointCallGen(false, fallbackLegacyImpl))
 
   addSqlFunction(
     CURRENT_TIME,
     Seq(),
-    new CurrentTimePointCallGen(false))
+    new CurrentTimePointCallGen(false, fallbackLegacyImpl))
 
   addSqlFunction(
     NOW,
     Seq(),
-    new CurrentTimePointCallGen(false))
+    new CurrentTimePointCallGen(false, fallbackLegacyImpl))
 
   addSqlFunction(
     CURRENT_TIMESTAMP,
     Seq(),
-    new CurrentTimePointCallGen(false))
+    new CurrentTimePointCallGen(false, fallbackLegacyImpl))
 
   addSqlFunction(
     LOCALTIME,
@@ -901,4 +904,8 @@ object FunctionGenerator {
     callGenerator: CallGenerator): Unit = {
     sqlFunctions((sqlOperator, operandTypes)) = callGenerator
   }
+}
+
+object FunctionGenerator {
+    def getInstance(config: TableConfig): FunctionGenerator = new FunctionGenerator(config)
 }

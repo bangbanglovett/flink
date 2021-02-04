@@ -30,6 +30,7 @@ import org.apache.flink.sql.parser.ddl.constraint.SqlTableConstraint;
 import org.apache.flink.sql.parser.ddl.constraint.SqlUniqueSpec;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.TableColumn;
+import org.apache.flink.table.api.TableConfig;
 import org.apache.flink.table.api.TableSchema;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.planner.calcite.FlinkTypeFactory;
@@ -69,7 +70,7 @@ public class MergeTableLikeUtilTest {
 
     @Rule public ExpectedException thrown = ExpectedException.none();
 
-    private final FlinkTypeFactory typeFactory = new FlinkTypeFactory(new FlinkTypeSystem());
+    private final FlinkTypeFactory typeFactory = new FlinkTypeFactory(new FlinkTypeSystem(), new TableConfig());
     private final SqlValidator sqlValidator =
             PlannerMocks.createDefaultPlanner().getOrCreateSqlValidator();
     private final MergeTableLikeUtil util = new MergeTableLikeUtil(sqlValidator, SqlNode::toString);

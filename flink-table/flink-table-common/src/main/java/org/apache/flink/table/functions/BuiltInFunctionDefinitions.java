@@ -1111,6 +1111,13 @@ public final class BuiltInFunctionDefinitions {
                     .outputTypeStrategy(TypeStrategies.MISSING)
                     .build();
 
+    public static final BuiltInFunctionDefinition NOW =
+        BuiltInFunctionDefinition.newBuilder()
+            .name("now")
+            .kind(SCALAR)
+            .outputTypeStrategy(TypeStrategies.MISSING)
+            .build();
+
     public static final BuiltInFunctionDefinition LOCAL_TIME =
             BuiltInFunctionDefinition.newBuilder()
                     .name("localTime")

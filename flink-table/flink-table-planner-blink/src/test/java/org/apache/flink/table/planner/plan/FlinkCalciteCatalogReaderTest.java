@@ -18,6 +18,7 @@
 
 package org.apache.flink.table.planner.plan;
 
+import org.apache.flink.table.api.TableConfig;
 import org.apache.flink.table.api.TableSchema;
 import org.apache.flink.table.catalog.CatalogManager;
 import org.apache.flink.table.catalog.ConnectorCatalogTable;
@@ -49,7 +50,7 @@ import static org.powermock.api.mockito.PowerMockito.when;
 
 /** Test for FlinkCalciteCatalogReader. */
 public class FlinkCalciteCatalogReaderTest {
-    private final FlinkTypeFactory typeFactory = new FlinkTypeFactory(new FlinkTypeSystem());
+    private final FlinkTypeFactory typeFactory = new FlinkTypeFactory(new FlinkTypeSystem(), new TableConfig());
     private final String tableMockName = "ts";
 
     private SchemaPlus rootSchemaPlus;

@@ -482,6 +482,33 @@ class CodeGeneratorContext(val tableConfig: TableConfig) {
   }
 
   /**
+   * Adds a reusable current time to the beginning of the SAM of the generated [[Function]].
+   */
+  def addReusableCurrentTime(): String = {
+    val fieldTerm = s"currentTime"
+
+    val timestamp = addReusableTimestamp()
+    val sessionTimeZone = addReusableSessionTimeZone()
+
+    // declaration
+    reusableMemberStatements.add(s"private int $fieldTerm;")
+
+    // assignment
+    // adopted from org.apache.calcite.runtime.SqlFunctions.currentTime()
+    val field =
+    s"""
+       |$fieldTerm = (int) (($timestamp.getMillisecond()
+       |  + $sessionTimeZone.getOffset($timestamp.getMillisecond()))
+       |  % ${DateTimeUtils.MILLIS_PER_DAY});
+       |if ($fieldTerm < 0) {
+       |  $fieldTerm += ${DateTimeUtils.MILLIS_PER_DAY};
+       |}
+       |""".stripMargin
+    reusablePerRecordStatements.add(field)
+    fieldTerm
+  }
+
+  /**
     * Adds a reusable local date time to the beginning of the SAM of the generated class.
     */
   def addReusableLocalDateTime(): String = {
@@ -546,6 +573,35 @@ class CodeGeneratorContext(val tableConfig: TableConfig) {
          |  $fieldTerm -= 1;
          |}
          |""".stripMargin
+    reusablePerRecordStatements.add(field)
+    fieldTerm
+  }
+
+
+  /**
+   * Adds a reusable current date to the beginning of the SAM of the generated class.
+   */
+  def addReusableCurrentDate(): String = {
+    val fieldTerm = s"currentDate"
+
+    val timestamp = addReusableTimestamp()
+    val time = addReusableCurrentTime()
+    val sessionTimeZone = addReusableSessionTimeZone()
+
+    // declaration
+    reusableMemberStatements.add(s"private int $fieldTerm;")
+
+    // assignment
+    // adopted from org.apache.calcite.runtime.SqlFunctions.currentDate()
+    val field =
+    s"""
+       |$fieldTerm = (int) (($timestamp.getMillisecond()
+       |  + $sessionTimeZone.getOffset($timestamp.getMillisecond()))
+       |  / ${DateTimeUtils.MILLIS_PER_DAY});
+       |if ($time < 0) {
+       |  $fieldTerm -= 1;
+       |}
+       |""".stripMargin
     reusablePerRecordStatements.add(field)
     fieldTerm
   }

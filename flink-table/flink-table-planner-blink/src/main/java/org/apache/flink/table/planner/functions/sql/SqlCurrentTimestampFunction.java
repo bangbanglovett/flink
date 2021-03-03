@@ -83,7 +83,7 @@ public class SqlCurrentTimestampFunction extends SqlFunction {
                     SqlTypeName.MAX_DATETIME_PRECISION));
         }
         TableConfig config =
-            ((FlinkTypeFactory) opBinding.getTypeFactory()).getConfig();
+            ((FlinkTypeFactory) opBinding.getTypeFactory()).getTableConfig();
         boolean fallbackLegacyImpl = config.getConfiguration().getBoolean(TABLE_EXEC_FALLBACK_LEGACY_TIME_FUNCTION);
         if (fallbackLegacyImpl) {
             return opBinding.getTypeFactory().createSqlType(SqlTypeName.TIMESTAMP, precision);

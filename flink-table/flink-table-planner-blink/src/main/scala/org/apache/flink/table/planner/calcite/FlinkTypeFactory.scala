@@ -32,6 +32,7 @@ import org.apache.calcite.sql.parser.SqlParserPos
 import org.apache.calcite.util.ConversionUtil
 import org.apache.flink.api.common.typeinfo.{BasicTypeInfo, NothingTypeInfo, TypeInformation}
 import org.apache.flink.api.java.typeutils.TypeExtractor
+import org.apache.flink.table.api.config.ExecutionConfigOptions.TABLE_EXEC_FALLBACK_LEGACY_TIME_FUNCTION
 import org.apache.flink.table.api.{DataTypes, TableConfig, TableException, TableSchema, ValidationException}
 import org.apache.flink.table.calcite.ExtendedRelTypeFactory
 import org.apache.flink.table.planner.calcite.FlinkTypeFactory.toLogicalType
@@ -51,7 +52,7 @@ import scala.collection.mutable
   * Flink specific type factory that represents the interface between Flink's [[LogicalType]]
   * and Calcite's [[RelDataType]].
   */
-class FlinkTypeFactory(typeSystem: RelDataTypeSystem, config: TableConfig = new TableConfig)
+class FlinkTypeFactory(typeSystem: RelDataTypeSystem, tableConfig: TableConfig = new TableConfig)
   extends JavaTypeFactoryImpl(typeSystem)
   with ExtendedRelTypeFactory {
 
@@ -60,7 +61,7 @@ class FlinkTypeFactory(typeSystem: RelDataTypeSystem, config: TableConfig = new 
   /**
    * Returns the TableConfig object.
    */
-  def getConfig(): TableConfig = config
+  def getTableConfig(): TableConfig = tableConfig
 
   /**
     * Create a calcite field type in table schema from [[LogicalType]]. It use
@@ -183,7 +184,13 @@ class FlinkTypeFactory(typeSystem: RelDataTypeSystem, config: TableConfig = new 
     * Creates a indicator type for processing-time, but with similar properties as SQL timestamp.
     */
   def createProctimeIndicatorType(isNullable: Boolean): RelDataType = {
-    val originalType = createFieldTypeFromLogicalType(new TimestampType(isNullable, 3))
+    val fallbackLegacyImpl = tableConfig.getConfiguration.getBoolean(TABLE_EXEC_FALLBACK_LEGACY_TIME_FUNCTION)
+    val originalType = if (fallbackLegacyImpl) {
+      createFieldTypeFromLogicalType(new TimestampType(isNullable, 3))
+    } else {
+      createFieldTypeFromLogicalType(new LocalZonedTimestampType(isNullable, 3))
+    }
+
     canonize(new TimeIndicatorRelDataType(
       getTypeSystem,
       originalType.asInstanceOf[BasicSqlType],

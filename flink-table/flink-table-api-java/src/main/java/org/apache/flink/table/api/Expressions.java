@@ -211,6 +211,14 @@ public final class Expressions {
     }
 
     /**
+     * Returns the row-level current SQL timestamp in local time zone, the underlying function
+     * return type is {@link DataTypes#TIMESTAMP_WITH_LOCAL_TIME_ZONE()}.
+     */
+    public static ApiExpression currentRowTimestamp() {
+        return apiCall(BuiltInFunctionDefinitions.CURRENT_ROW_TIMESTAMP);
+    }
+
+    /**
      * Returns the current SQL time in local time zone, the underlying function return type is
      * {@link DataTypes#TIME()}, this is a synonym for {@link Expressions#currentTime()}.
      */

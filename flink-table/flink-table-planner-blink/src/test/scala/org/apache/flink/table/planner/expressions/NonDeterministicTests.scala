@@ -58,6 +58,12 @@ class NonDeterministicTests extends ExpressionTestBase {
 
     testSqlApi(s"NOW() > ${timestampLtz("1970-01-01 00:00:00")}",
       "true")
+
+    testAllApis(
+      currentRowTimestamp().isGreater(
+        "1970-01-01 00:00:00".cast(DataTypes.TIMESTAMP_WITH_LOCAL_TIME_ZONE())),
+      s"CURRENT_ROW_TIMESTAMP > ${timestampLtz("1970-01-01 00:00:00")}",
+      "true")
   }
 
   @Test
@@ -68,7 +74,8 @@ class NonDeterministicTests extends ExpressionTestBase {
       "CURRENT_TIMESTAMP",
       "NOW()",
       "LOCALTIME",
-      "LOCALTIMESTAMP"))
+      "LOCALTIMESTAMP",
+      "CURRENT_ROW_TIMESTAMP"))
     val result1 = evaluateFunction(temporalFunctions)
     Thread.sleep(1 * 1000L)
     val result2: List[String] = evaluateFunction(temporalFunctions)
@@ -91,6 +98,19 @@ class NonDeterministicTests extends ExpressionTestBase {
     Thread.sleep(1 * 1000L)
     val result2: List[String] = evaluateFunction(temporalFunctions)
     assertEquals(result1, result2)
+    cleanExprs()
+  }
+
+  @Test
+  def testCurrentRowTimestampInBatchMode(): Unit = {
+    config.getConfiguration.set(ExecutionOptions.RUNTIME_MODE, RuntimeExecutionMode.BATCH)
+    val temporalFunctions = getGeneratedFunction(List(
+      "CURRENT_ROW_TIMESTAMP"))
+    val result1 = evaluateFunction(temporalFunctions)
+    Thread.sleep(1 * 1000L)
+    val result2: List[String] = evaluateFunction(temporalFunctions)
+    //CURRENT_ROW_TIMESTAMP recalculates for per record both in batch and stream mode
+    assert(result1.toString() < result2.toString())
     cleanExprs()
   }
 
@@ -193,7 +213,7 @@ class NonDeterministicTests extends ExpressionTestBase {
       .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
 
     // the LOCALTIME/LOCALTIMESTAMP functions are not deterministic, thus we
-    // use following pattern to check the returned SQL timestamp in session time zone Shanghai
+    // use following pattern to check it return SQL timestamp in session time zone Shanghai
     testSqlApi(
       s"TIME_SUB(LOCALTIME, TIME '$formattedLocalTime') <= 60000",
       "true")

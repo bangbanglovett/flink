@@ -567,6 +567,10 @@ public class FlinkSqlOperatorTable extends ReflectiveSqlOperatorTable {
             new SqlCurrentTimestampFunction(
                     "CURRENT_TIMESTAMP", SqlTypeName.TIMESTAMP_WITH_LOCAL_TIME_ZONE);
 
+    public static final SqlFunction CURRENT_ROW_TIMESTAMP =
+            new SqlCurrentTimestampFunction(
+                    "CURRENT_ROW_TIMESTAMP", SqlTypeName.TIMESTAMP_WITH_LOCAL_TIME_ZONE);
+
     public static final SqlFunction UNIX_TIMESTAMP =
             new SqlFunction(
                     "UNIX_TIMESTAMP",

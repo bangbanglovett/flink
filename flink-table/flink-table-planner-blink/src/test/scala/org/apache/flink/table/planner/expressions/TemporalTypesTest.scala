@@ -254,11 +254,11 @@ class TemporalTypesTest extends ExpressionTestBase {
       "1970-01-01 10:20:45.000")
 
     testSqlApi(
-      s"CAST(${timestampTz("2018-03-14 01:02:03")} AS TIME)",
+      s"CAST(${timestampLtz("2018-03-14 01:02:03")} AS TIME)",
       "01:02:03")
 
     testSqlApi(
-      s"CAST(${timestampTz("2018-03-14 01:02:03")} AS DATE)",
+      s"CAST(${timestampLtz("2018-03-14 01:02:03")} AS DATE)",
       "2018-03-14")
   }
 
@@ -588,11 +588,11 @@ class TemporalTypesTest extends ExpressionTestBase {
       "2018/03/14 01:02:03.123456")
 
     testSqlApi(
-      s"DATE_FORMAT(${timestampTz("2018-03-14 01:02:03")}, 'yyyy-MM-dd HH:mm:ss')",
+      s"DATE_FORMAT(${timestampLtz("2018-03-14 01:02:03")}, 'yyyy-MM-dd HH:mm:ss')",
       "2018-03-14 01:02:03")
 
     testSqlApi(
-      s"DATE_FORMAT(${timestampTz("2018-03-14 01:02:03.123456")}, 'yyyy-MM-dd HH:mm:ss.SSSSSS')",
+      s"DATE_FORMAT(${timestampLtz("2018-03-14 01:02:03.123456")}, 'yyyy-MM-dd HH:mm:ss.SSSSSS')",
       "2018-03-14 01:02:03.123456")
   }
 
@@ -609,11 +609,11 @@ class TemporalTypesTest extends ExpressionTestBase {
       "2018/03/14 01:02:03.123456")
 
     testSqlApi(
-      s"DATE_FORMAT(${timestampTz("2018-03-14 01:02:03")}, 'yyyy-MM-dd HH:mm:ss')",
+      s"DATE_FORMAT(${timestampLtz("2018-03-14 01:02:03")}, 'yyyy-MM-dd HH:mm:ss')",
       "2018-03-14 01:02:03")
 
     testSqlApi(
-      s"DATE_FORMAT(${timestampTz("2018-03-14 01:02:03.123456")}, 'yyyy-MM-dd HH:mm:ss.SSSSSS')",
+      s"DATE_FORMAT(${timestampLtz("2018-03-14 01:02:03.123456")}, 'yyyy-MM-dd HH:mm:ss.SSSSSS')",
       "2018-03-14 01:02:03.123456")
 
   }
@@ -631,11 +631,11 @@ class TemporalTypesTest extends ExpressionTestBase {
       "2018/03/14 01:02:03.123456")
 
     testSqlApi(
-      s"DATE_FORMAT(${timestampTz("2018-03-14 01:02:03")}, 'yyyy-MM-dd HH:mm:ss')",
+      s"DATE_FORMAT(${timestampLtz("2018-03-14 01:02:03")}, 'yyyy-MM-dd HH:mm:ss')",
       "2018-03-14 01:02:03")
 
     testSqlApi(
-      s"DATE_FORMAT(${timestampTz("2018-03-14 01:02:03.123456")}, 'yyyy-MM-dd HH:mm:ss.SSSSSS')",
+      s"DATE_FORMAT(${timestampLtz("2018-03-14 01:02:03.123456")}, 'yyyy-MM-dd HH:mm:ss.SSSSSS')",
       "2018-03-14 01:02:03.123456")
 
   }
@@ -674,44 +674,23 @@ class TemporalTypesTest extends ExpressionTestBase {
     //testSqlApi("CEIL(TIMESTAMP '2018-03-20 06:10:31' TO HOUR)", "2018-03-20 07:00:00.000")
   }
 
-  private def timestampTz(str: String): String = {
-    val precision = extractPrecision(str)
-    timestampTz(str, precision)
-  }
-
-  private def timestampTz(str: String, precision: Int): String = {
-    s"CAST(TIMESTAMP '$str' AS TIMESTAMP($precision) WITH LOCAL TIME ZONE)"
-  }
-
-  // According to SQL standard, the length of second fraction is
-  // the precision of the Timestamp literal
-  private def extractPrecision(str: String): Int = {
-    val dot = str.indexOf('.')
-    if (dot == -1) {
-      0
-    } else {
-      str.length - dot - 1
-    }
-  }
-
-
   @Test
   def testTemporalShanghai(): Unit = {
     config.setLocalTimeZone(ZoneId.of("Asia/Shanghai"))
 
-    testSqlApi(timestampTz("2018-03-14 19:01:02.123"), "2018-03-14 19:01:02.123")
-    testSqlApi(timestampTz("2018-03-14 19:00:00.010"), "2018-03-14 19:00:00.010")
+    testSqlApi(timestampLtz("2018-03-14 19:01:02.123"), "2018-03-14 19:01:02.123")
+    testSqlApi(timestampLtz("2018-03-14 19:00:00.010"), "2018-03-14 19:00:00.010")
 
     testSqlApi(
-      timestampTz("2018-03-14 19:00:00.010") + " > " + "f25",
+      timestampLtz("2018-03-14 19:00:00.010") + " > " + "f25",
       "true")
 
     testSqlApi(
-      s"${timestampTz("2018-03-14 01:02:03.123456789", 9)}",
+      s"${timestampLtz("2018-03-14 01:02:03.123456789", 9)}",
       "2018-03-14 01:02:03.123456789")
 
     testSqlApi(
-      s"${timestampTz("2018-03-14 01:02:03.123456", 6)}",
+      s"${timestampLtz("2018-03-14 01:02:03.123456", 6)}",
       "2018-03-14 01:02:03.123456")
 
 
@@ -721,11 +700,11 @@ class TemporalTypesTest extends ExpressionTestBase {
       "2018/03/14 01:02:03")
 
     testSqlApi(
-      s"DATE_FORMAT(${timestampTz("2018-03-14 01:02:03")}, 'yyyy-MM-dd HH:mm:ss')",
+      s"DATE_FORMAT(${timestampLtz("2018-03-14 01:02:03")}, 'yyyy-MM-dd HH:mm:ss')",
       "2018-03-14 01:02:03")
 
     // EXTRACT
-    val extractT1 = timestampTz("2018-03-20 07:59:59")
+    val extractT1 = timestampLtz("2018-03-20 07:59:59")
     testSqlApi(s"EXTRACT(DAY FROM $extractT1)", "20")
     testSqlApi(s"EXTRACT(HOUR FROM $extractT1)", "7")
     testSqlApi(s"EXTRACT(MONTH FROM $extractT1)", "3")
@@ -756,21 +735,21 @@ class TemporalTypesTest extends ExpressionTestBase {
     testSqlApi("CEIL(TIMESTAMP '2018-01-01 21:00:01' TO YEAR)", "2018-01-01 00:00:00")
     testSqlApi("CEIL(TIMESTAMP '2018-01-02 21:00:01' TO YEAR)", "2019-01-01 00:00:00")
 
-    testSqlApi(s"FLOOR(${timestampTz("2018-03-20 06:44:31")} TO HOUR)", "2018-03-20 06:00:00")
-    testSqlApi(s"FLOOR(${timestampTz("2018-03-20 06:44:31")} TO DAY)", "2018-03-20 00:00:00")
-    testSqlApi(s"FLOOR(${timestampTz("2018-03-20 00:00:00")} TO DAY)", "2018-03-20 00:00:00")
-    testSqlApi(s"FLOOR(${timestampTz("2018-04-01 06:44:31")} TO MONTH)", "2018-04-01 00:00:00")
-    testSqlApi(s"FLOOR(${timestampTz("2018-01-01 06:44:31")} TO MONTH)", "2018-01-01 00:00:00")
-    testSqlApi(s"CEIL(${timestampTz("2018-03-20 06:44:31")} TO HOUR)", "2018-03-20 07:00:00")
-    testSqlApi(s"CEIL(${timestampTz("2018-03-20 06:00:00")} TO HOUR)", "2018-03-20 06:00:00")
-    testSqlApi(s"CEIL(${timestampTz("2018-03-20 06:44:31")} TO DAY)", "2018-03-21 00:00:00")
-    testSqlApi(s"CEIL(${timestampTz("2018-03-1 00:00:00")} TO DAY)", "2018-03-01 00:00:00")
-    testSqlApi(s"CEIL(${timestampTz("2018-03-31 00:00:01")} TO DAY)", "2018-04-01 00:00:00")
-    testSqlApi(s"CEIL(${timestampTz("2018-03-01 21:00:01")} TO MONTH)", "2018-03-01 00:00:00")
-    testSqlApi(s"CEIL(${timestampTz("2018-03-01 00:00:00")} TO MONTH)", "2018-03-01 00:00:00")
-    testSqlApi(s"CEIL(${timestampTz("2018-12-02 00:00:00")} TO MONTH)", "2019-01-01 00:00:00")
-    testSqlApi(s"CEIL(${timestampTz("2018-01-01 21:00:01")} TO YEAR)", "2018-01-01 00:00:00")
-    testSqlApi(s"CEIL(${timestampTz("2018-01-02 21:00:01")} TO YEAR)", "2019-01-01 00:00:00")
+    testSqlApi(s"FLOOR(${timestampLtz("2018-03-20 06:44:31")} TO HOUR)", "2018-03-20 06:00:00")
+    testSqlApi(s"FLOOR(${timestampLtz("2018-03-20 06:44:31")} TO DAY)", "2018-03-20 00:00:00")
+    testSqlApi(s"FLOOR(${timestampLtz("2018-03-20 00:00:00")} TO DAY)", "2018-03-20 00:00:00")
+    testSqlApi(s"FLOOR(${timestampLtz("2018-04-01 06:44:31")} TO MONTH)", "2018-04-01 00:00:00")
+    testSqlApi(s"FLOOR(${timestampLtz("2018-01-01 06:44:31")} TO MONTH)", "2018-01-01 00:00:00")
+    testSqlApi(s"CEIL(${timestampLtz("2018-03-20 06:44:31")} TO HOUR)", "2018-03-20 07:00:00")
+    testSqlApi(s"CEIL(${timestampLtz("2018-03-20 06:00:00")} TO HOUR)", "2018-03-20 06:00:00")
+    testSqlApi(s"CEIL(${timestampLtz("2018-03-20 06:44:31")} TO DAY)", "2018-03-21 00:00:00")
+    testSqlApi(s"CEIL(${timestampLtz("2018-03-1 00:00:00")} TO DAY)", "2018-03-01 00:00:00")
+    testSqlApi(s"CEIL(${timestampLtz("2018-03-31 00:00:01")} TO DAY)", "2018-04-01 00:00:00")
+    testSqlApi(s"CEIL(${timestampLtz("2018-03-01 21:00:01")} TO MONTH)", "2018-03-01 00:00:00")
+    testSqlApi(s"CEIL(${timestampLtz("2018-03-01 00:00:00")} TO MONTH)", "2018-03-01 00:00:00")
+    testSqlApi(s"CEIL(${timestampLtz("2018-12-02 00:00:00")} TO MONTH)", "2019-01-01 00:00:00")
+    testSqlApi(s"CEIL(${timestampLtz("2018-01-01 21:00:01")} TO YEAR)", "2018-01-01 00:00:00")
+    testSqlApi(s"CEIL(${timestampLtz("2018-01-02 21:00:01")} TO YEAR)", "2019-01-01 00:00:00")
 
     // others
     testSqlApi("QUARTER(DATE '2016-04-12')", "2")
@@ -819,8 +798,8 @@ class TemporalTypesTest extends ExpressionTestBase {
     // Asia/Rangoon UTC Offset 6.5
     config.setLocalTimeZone(ZoneId.of("Asia/Rangoon"))
 
-    val t1 = timestampTz("2018-03-20 06:10:31")
-    val t2 = timestampTz("2018-03-20 06:00:00")
+    val t1 = timestampLtz("2018-03-20 06:10:31")
+    val t2 = timestampLtz("2018-03-20 06:00:00")
     // 1521502831000,  2018-03-19 23:40:31 UTC,  2018-03-20 06:10:31 +06:30
     testSqlApi(s"EXTRACT(HOUR FROM $t1)", "6")
     testSqlApi(s"FLOOR($t1 TO HOUR)", "2018-03-20 06:00:00")
@@ -967,15 +946,15 @@ class TemporalTypesTest extends ExpressionTestBase {
       "123456789")
 
     testSqlApi(
-      s"EXTRACT(MILLISECOND FROM ${timestampTz("1970-01-01 00:00:00.123456789", 9)})",
+      s"EXTRACT(MILLISECOND FROM ${timestampLtz("1970-01-01 00:00:00.123456789", 9)})",
       "123")
 
     testSqlApi(
-      s"EXTRACT(MICROSECOND FROM ${timestampTz("1970-01-01 00:00:00.123456789", 9)})",
+      s"EXTRACT(MICROSECOND FROM ${timestampLtz("1970-01-01 00:00:00.123456789", 9)})",
       "123456")
 
     testSqlApi(
-      s"EXTRACT(NANOSECOND FROM ${timestampTz("1970-01-01 00:00:00.123456789", 9)})",
+      s"EXTRACT(NANOSECOND FROM ${timestampLtz("1970-01-01 00:00:00.123456789", 9)})",
       "123456789")
 
 
@@ -1046,7 +1025,7 @@ class TemporalTypesTest extends ExpressionTestBase {
       "1970-01-01 00:00:00")
 
     testSqlApi(
-      s"CAST(${timestampTz("1970-01-01 00:00:00.123456789", 9)} " +
+      s"CAST(${timestampLtz("1970-01-01 00:00:00.123456789", 9)} " +
         "AS TIMESTAMP(6) WITH LOCAL TIME ZONE)",
       "1970-01-01 00:00:00.123456"
     )
@@ -1100,13 +1079,13 @@ class TemporalTypesTest extends ExpressionTestBase {
 
 
     testSqlApi(
-      s"${timestampTz("1970-01-01 00:00:00.123456789", 9)} > " +
-        s"${timestampTz("1970-01-01 00:00:00.123456788", 9)}",
+      s"${timestampLtz("1970-01-01 00:00:00.123456789", 9)} > " +
+        s"${timestampLtz("1970-01-01 00:00:00.123456788", 9)}",
       "true")
 
     testSqlApi(
-      s"${timestampTz("1970-01-01 00:00:00.123456788", 9)} < " +
-        s"${timestampTz("1970-01-01 00:00:00.123456789", 9)}",
+      s"${timestampLtz("1970-01-01 00:00:00.123456788", 9)} < " +
+        s"${timestampLtz("1970-01-01 00:00:00.123456789", 9)}",
       "true")
 
 
@@ -1116,7 +1095,7 @@ class TemporalTypesTest extends ExpressionTestBase {
       "1970/01/01 00:00:00.123456789")
 
     testSqlApi(
-      s"DATE_FORMAT(${timestampTz("2018-03-14 01:02:03.123456789", 9)}, " +
+      s"DATE_FORMAT(${timestampLtz("2018-03-14 01:02:03.123456789", 9)}, " +
         "'yyyy-MM-dd HH:mm:ss.SSSSSSSSS')",
       "2018-03-14 01:02:03.123456789")
 

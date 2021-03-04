@@ -445,6 +445,14 @@ trait ImplicitExpressionConversions {
   }
 
   /**
+   * Returns the row-level current SQL timestamp in local time zone,
+   * the underlying function return type is [[DataTypes.TIMESTAMP_WITH_LOCAL_TIME_ZONE()]].
+   */
+  def currentRowTimestamp(): Expression = {
+    Expressions.currentRowTimestamp()
+  }
+
+  /**
     * Returns the current SQL time in local time zone,
     * the underlying function return type is [[DataTypes.TIME]],
     * this is a synonym for [[ImplicitExpressionConversions.currentTime()]].

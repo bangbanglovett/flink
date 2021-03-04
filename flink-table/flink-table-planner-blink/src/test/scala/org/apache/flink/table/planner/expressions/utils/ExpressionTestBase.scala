@@ -18,7 +18,6 @@
 
 package org.apache.flink.table.planner.expressions.utils
 
-import java.util
 import java.util.Collections
 
 import org.apache.calcite.plan.hep.{HepPlanner, HepProgramBuilder}
@@ -194,6 +193,7 @@ abstract class ExpressionTestBase {
         .asInstanceOf[DataStructureConverter[RowData, Row]]
       converter.toInternalOrNull(testData)
     }
+
     val result = mapper.map(testRow)
 
     // call close method for RichFunction

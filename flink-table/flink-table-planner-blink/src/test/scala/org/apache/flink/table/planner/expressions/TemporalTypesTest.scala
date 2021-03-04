@@ -766,6 +766,17 @@ class TemporalTypesTest extends ExpressionTestBase {
   }
 
   @Test
+  def testCeil(): Unit = {
+    testSqlApi("FLOOR(TIMESTAMP '2021-03-01 00:00:00' TO WEEK)", "2021-02-28 00:00:00")
+    testSqlApi("FLOOR( DATE '2021-03-01' TO WEEK)", "2021-02-28")
+    testSqlApi(s"FLOOR(${timestampLtz("2021-03-01 00:00:00")} TO WEEK)", "2021-02-28 00:00:00")
+
+    testSqlApi("CEIL(TIMESTAMP '2021-03-01 00:00:00' TO WEEK)", "2021-03-07 00:00:00")
+    testSqlApi("CEIL( DATE '2021-03-01' TO WEEK)", "2021-03-07")
+    testSqlApi(s"CEIL(${timestampLtz("2021-03-01 00:00:00")} TO WEEK)", "2021-03-07 00:00:00")
+  }
+
+  @Test
   def testTemporalShanghai(): Unit = {
     config.setLocalTimeZone(ZoneId.of("Asia/Shanghai"))
 

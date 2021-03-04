@@ -1111,6 +1111,13 @@ public final class BuiltInFunctionDefinitions {
                     .outputTypeStrategy(TypeStrategies.MISSING)
                     .build();
 
+    public static final BuiltInFunctionDefinition CURRENT_ROW_TIMESTAMP =
+        BuiltInFunctionDefinition.newBuilder()
+            .name("currentRowTimestamp")
+            .kind(SCALAR)
+            .outputTypeStrategy(TypeStrategies.MISSING)
+            .build();
+
     public static final BuiltInFunctionDefinition NOW =
         BuiltInFunctionDefinition.newBuilder()
             .name("now")

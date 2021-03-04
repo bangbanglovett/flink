@@ -210,6 +210,10 @@ class PlannerExpressionConverter private extends ApiExpressionVisitor[PlannerExp
             assert(args.isEmpty)
             CurrentTimestamp()
 
+          case CURRENT_ROW_TIMESTAMP =>
+            assert(args.isEmpty)
+            CurrentRowTimestamp()
+
           case LOCAL_TIME =>
             assert(args.isEmpty)
             LocalTime()

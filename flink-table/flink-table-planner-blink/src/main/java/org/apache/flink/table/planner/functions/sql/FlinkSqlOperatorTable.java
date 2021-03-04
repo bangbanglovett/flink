@@ -18,6 +18,8 @@
 
 package org.apache.flink.table.planner.functions.sql;
 
+import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.sql.type.SqlTypeUtil;
 import org.apache.flink.table.planner.calcite.FlinkTypeFactory;
 import org.apache.flink.table.planner.functions.sql.internal.SqlAuxiliaryGroupAggFunction;
 import org.apache.flink.table.planner.plan.type.FlinkReturnTypes;
@@ -50,6 +52,7 @@ import org.apache.calcite.sql.validate.SqlNameMatchers;
 import java.util.Arrays;
 import java.util.List;
 
+import static org.apache.calcite.util.Static.RESOURCE;
 import static org.apache.flink.table.planner.plan.type.FlinkReturnTypes.ARG0_VARCHAR_FORCE_NULLABLE;
 import static org.apache.flink.table.planner.plan.type.FlinkReturnTypes.STR_MAP_NULLABLE;
 import static org.apache.flink.table.planner.plan.type.FlinkReturnTypes.VARCHAR_2000_NULLABLE;
@@ -576,6 +579,51 @@ public class FlinkSqlOperatorTable extends ReflectiveSqlOperatorTable {
                     null,
                     null,
                     OperandTypes.or(OperandTypes.POSITIVE_INTEGER_LITERAL, OperandTypes.NILADIC));
+
+    public static final SqlFunction CURRENT_ROW_TIMESTAMP =
+        new SqlFunction(
+            "CURRENT_ROW_TIMESTAMP",
+            SqlKind.OTHER_FUNCTION,
+            null,
+            null,
+            OperandTypes.or(OperandTypes.POSITIVE_INTEGER_LITERAL, OperandTypes.NILADIC),
+            SqlFunctionCategory.TIMEDATE) {
+
+            @Override
+            public SqlSyntax getSyntax() {
+                return SqlSyntax.FUNCTION_ID;
+            }
+
+            @Override
+            public boolean isDeterministic() {
+                return false;
+            }
+
+            @Override
+            public RelDataType inferReturnType(SqlOperatorBinding opBinding) {
+                int precision = 0;
+                if (opBinding.getOperandCount() == 1) {
+                    RelDataType type = opBinding.getOperandType(0);
+                    if (SqlTypeUtil.isNumeric(type)) {
+                        precision = opBinding.getOperandLiteralValue(0, Integer.class);
+                    }
+                }
+                assert precision >= 0;
+                if (precision > SqlTypeName.MAX_DATETIME_PRECISION) {
+                    throw opBinding.newError(
+                        RESOURCE.argumentMustBeValidPrecision(
+                            opBinding.getOperator().getName(),
+                            0,
+                            SqlTypeName.MAX_DATETIME_PRECISION));
+                }
+                return opBinding.getTypeFactory().createSqlType(SqlTypeName.TIMESTAMP_WITH_LOCAL_TIME_ZONE, precision);
+            }
+
+            @Override
+            public SqlMonotonicity getMonotonicity(SqlOperatorBinding call) {
+                return SqlMonotonicity.INCREASING;
+            }
+        };
 
     public static final SqlFunction UNIX_TIMESTAMP =
             new SqlFunction(

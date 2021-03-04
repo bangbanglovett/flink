@@ -504,6 +504,11 @@ class FunctionGenerator private(config: TableConfig) {
     new CurrentTimePointCallGen(false, fallbackLegacyImpl))
 
   addSqlFunction(
+    CURRENT_ROW_TIMESTAMP,
+    Seq(),
+    new CurrentTimePointCallGen(false, false))
+
+  addSqlFunction(
     LOCALTIME,
     Seq(),
     new CurrentTimePointCallGen(true))
@@ -728,7 +733,6 @@ class FunctionGenerator private(config: TableConfig) {
     TO_TIMESTAMP_LTZ,
     Seq(DECIMAL, INTEGER),
     BuiltInMethods.DECIMAL_TO_TIMESTAMP_LTZ_WITH_PRECISION)
-
 
   INTEGRAL_TYPES foreach (
     dt => addSqlFunctionMethod(

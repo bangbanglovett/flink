@@ -84,6 +84,14 @@ class NonDeterministicTests extends ExpressionTestBase {
   }
 
   @Test
+  def testCurrentRowTimestamp(): Unit = {
+    testAllApis(
+      currentRowTimestamp().isGreater("1970-01-01 00:00:00".cast(DataTypes.TIMESTAMP_LTZ())),
+      s"CURRENT_ROW_TIMESTAMP > ${timestampLtz("1970-01-01 00:00:00")}",
+      "true")
+  }
+
+  @Test
   def testCurrentTimestampInUTC(): Unit = {
     config.setLocalTimeZone(ZoneId.of("UTC"))
     val localDateTime = LocalDateTime.now(ZoneId.of("UTC"))

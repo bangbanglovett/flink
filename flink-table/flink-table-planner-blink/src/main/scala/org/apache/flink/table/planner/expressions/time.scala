@@ -109,6 +109,8 @@ case class CurrentTime() extends CurrentTimePoint(SqlTimeTypeInfo.TIME, local = 
 
 case class CurrentTimestamp() extends CurrentTimePoint(SqlTimeTypeInfo.TIMESTAMP, local = false)
 
+case class CurrentRowTimestamp() extends CurrentTimePoint(SqlTimeTypeInfo.TIMESTAMP, local = false)
+
 case class LocalTime() extends CurrentTimePoint(SqlTimeTypeInfo.TIME, local = true)
 
 case class LocalTimestamp() extends CurrentTimePoint(SqlTimeTypeInfo.TIMESTAMP, local = true)

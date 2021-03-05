@@ -27,42 +27,74 @@ import org.apache.flink.table.types.logical.LogicalTypeRoot.{DATE, TIMESTAMP_WIT
   * Generates function call to determine current time point (as date/time/timestamp) in
   * local timezone or not.
   */
-class CurrentTimePointCallGen(local: Boolean, fallbackLegacyImpl: Boolean = false) extends CallGenerator {
+class CurrentTimePointCallGen(local: Boolean, fallbackLegacyImpl: Boolean = false, isRowLevel: Boolean = true) extends CallGenerator {
 
   override def generate(
       ctx: CodeGeneratorContext,
       operands: Seq[GeneratedExpression],
       returnType: LogicalType): GeneratedExpression = returnType.getTypeRoot match {
-    case TIME_WITHOUT_TIME_ZONE if local =>
+    case TIME_WITHOUT_TIME_ZONE if local && isRowLevel =>
       val time = ctx.addReusableLocalTime()
       generateNonNullField(returnType, time)
 
-    case TIMESTAMP_WITHOUT_TIME_ZONE if local =>
+    case TIME_WITHOUT_TIME_ZONE if local && !isRowLevel =>
+      val time = ctx.addReusableSessionLocalTime()
+      generateNonNullField(returnType, time)
+
+    case TIMESTAMP_WITHOUT_TIME_ZONE if local && isRowLevel =>
       val timestamp = ctx.addReusableLocalDateTime()
       generateNonNullField(returnType, timestamp)
 
-    case DATE if fallbackLegacyImpl =>
+    case TIMESTAMP_WITHOUT_TIME_ZONE if local && !isRowLevel =>
+      val timestamp = ctx.addReusableSessionLocalDateTime()
+      generateNonNullField(returnType, timestamp)
+
+    case DATE if fallbackLegacyImpl && isRowLevel =>
       val date = ctx.addReusableDate()
       generateNonNullField(returnType, date)
 
-    case TIME_WITHOUT_TIME_ZONE if fallbackLegacyImpl =>
+    case DATE if fallbackLegacyImpl && !isRowLevel =>
+      val date = ctx.addReusableSessionDate()
+      generateNonNullField(returnType, date)
+
+    case TIME_WITHOUT_TIME_ZONE if fallbackLegacyImpl && isRowLevel =>
       val time = ctx.addReusableTime()
       generateNonNullField(returnType, time)
 
-    case TIMESTAMP_WITHOUT_TIME_ZONE if fallbackLegacyImpl =>
+    case TIME_WITHOUT_TIME_ZONE if fallbackLegacyImpl && !isRowLevel =>
+      val time = ctx.addReusableSessionTime()
+      generateNonNullField(returnType, time)
+
+    case TIMESTAMP_WITHOUT_TIME_ZONE if fallbackLegacyImpl && isRowLevel =>
       val timestamp = ctx.addReusableTimestamp()
       generateNonNullField(returnType, timestamp)
 
-    case DATE if !fallbackLegacyImpl =>
+    case TIMESTAMP_WITHOUT_TIME_ZONE if fallbackLegacyImpl && !isRowLevel =>
+      val timestamp = ctx.addReusableSessionTimestamp()
+      generateNonNullField(returnType, timestamp)
+
+    case DATE if !fallbackLegacyImpl && isRowLevel =>
       val date = ctx.addReusableCurrentDate()
       generateNonNullField(returnType, date)
 
-    case TIME_WITHOUT_TIME_ZONE if !fallbackLegacyImpl =>
+    case DATE if !fallbackLegacyImpl && !isRowLevel =>
+      val date = ctx.addReusableSessionCurrentDate()
+      generateNonNullField(returnType, date)
+
+    case TIME_WITHOUT_TIME_ZONE if !fallbackLegacyImpl && isRowLevel =>
       val time = ctx.addReusableCurrentTime()
       generateNonNullField(returnType, time)
 
-    case TIMESTAMP_WITH_LOCAL_TIME_ZONE if !fallbackLegacyImpl =>
+    case TIME_WITHOUT_TIME_ZONE if !fallbackLegacyImpl && !isRowLevel =>
+      val time = ctx.addReusableSessionCurrentTime()
+      generateNonNullField(returnType, time)
+
+    case TIMESTAMP_WITH_LOCAL_TIME_ZONE if !fallbackLegacyImpl && isRowLevel =>
       val timestamp = ctx.addReusableTimestamp()
+      generateNonNullField(returnType, timestamp)
+
+    case TIMESTAMP_WITH_LOCAL_TIME_ZONE if !fallbackLegacyImpl && !isRowLevel =>
+      val timestamp = ctx.addReusableSessionTimestamp()
       generateNonNullField(returnType, timestamp)
   }
 

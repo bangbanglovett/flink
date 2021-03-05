@@ -22,7 +22,9 @@ import java.sql.Time
 import java.time.format.DateTimeFormatter
 import java.time.{LocalDate, LocalDateTime, ZoneId}
 
+import org.apache.flink.api.common.RuntimeExecutionMode
 import org.apache.flink.api.java.typeutils.RowTypeInfo
+import org.apache.flink.configuration.ExecutionOptions
 import org.apache.flink.table.api._
 import org.apache.flink.table.api.config.ExecutionConfigOptions.TABLE_EXEC_FALLBACK_LEGACY_TIME_FUNCTION
 import org.apache.flink.table.functions.ScalarFunction
@@ -81,6 +83,43 @@ class NonDeterministicTests extends ExpressionTestBase {
       now().isGreater("1970-01-01 00:00:00".cast(DataTypes.TIMESTAMP_LTZ())),
       s"NOW() > ${timestampLtz("1970-01-01 00:00:00")}",
       "true")
+  }
+
+
+  @Test
+  def testCurrentDateTimeInBatchMode(): Unit = {
+
+    config.getConfiguration.set(ExecutionOptions.RUNTIME_MODE, RuntimeExecutionMode.BATCH)
+
+//    testAllApis(
+//      currentDate().isGreater("1970-01-01".toDate),
+//      "CURRENT_DATE > DATE '1970-01-01'",
+//      "true")
+//
+//    testAllApis(
+//      currentTime().isGreaterOrEqual("00:00:00".toTime),
+//      "CURRENT_TIME >= TIME '00:00:00'",
+//      "true")
+//
+//    testAllApis(
+//      currentTimestamp().isGreater("1970-01-01 00:00:00".cast(DataTypes.TIMESTAMP_LTZ())),
+//      s"CURRENT_TIMESTAMP > ${timestampLtz("1970-01-01 00:00:00")}",
+//      "true")
+//
+//    testAllApis(
+//      now().isGreater("1970-01-01 00:00:00".cast(DataTypes.TIMESTAMP_LTZ())),
+//      s"NOW() > ${timestampLtz("1970-01-01 00:00:00")}",
+//      "true")
+
+    testAllApis(
+      localTime().isGreaterOrEqual("00:00:00".toTime),
+      "LOCALTIME >= TIME '00:00:00'",
+      "true")
+
+//    testAllApis(
+//      localTimestamp().isGreater("1970-01-01 00:00:00".toTimestamp),
+//      s"LOCALTIMESTAMP > TIMESTAMP '1970-01-01 00:00:00'",
+//      "true")
   }
 
   @Test

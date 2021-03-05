@@ -24,11 +24,12 @@ import org.apache.flink.table.planner.functions.sql.FlinkSqlOperatorTable._
 import org.apache.flink.table.runtime.types.PlannerTypeUtils.isPrimitive
 import org.apache.flink.table.types.logical.LogicalTypeRoot._
 import org.apache.flink.table.types.logical.{LogicalType, LogicalTypeRoot}
-
 import org.apache.calcite.sql.SqlOperator
 import org.apache.calcite.util.BuiltInMethod
-
 import java.lang.reflect.Method
+
+import org.apache.flink.api.common.RuntimeExecutionMode
+import org.apache.flink.configuration.ExecutionOptions
 
 import scala.collection.mutable
 
@@ -483,25 +484,28 @@ class FunctionGenerator private(config: TableConfig) {
       Some(BuiltInMethods.TIMESTAMP_CEIL_TIME_ZONE)))
 
   val fallbackLegacyImpl = config.getConfiguration.getBoolean(TABLE_EXEC_FALLBACK_LEGACY_TIME_FUNCTION)
+  val isStreamingMode = RuntimeExecutionMode.STREAMING.equals(
+    config.getConfiguration.get(ExecutionOptions.RUNTIME_MODE))
+
   addSqlFunction(
     CURRENT_DATE,
     Seq(),
-    new CurrentTimePointCallGen(false, fallbackLegacyImpl))
+    new CurrentTimePointCallGen(false, fallbackLegacyImpl, isStreamingMode))
 
   addSqlFunction(
     CURRENT_TIME,
     Seq(),
-    new CurrentTimePointCallGen(false, fallbackLegacyImpl))
+    new CurrentTimePointCallGen(false, fallbackLegacyImpl, isStreamingMode))
 
   addSqlFunction(
     NOW,
     Seq(),
-    new CurrentTimePointCallGen(false, fallbackLegacyImpl))
+    new CurrentTimePointCallGen(false, fallbackLegacyImpl, isStreamingMode))
 
   addSqlFunction(
     CURRENT_TIMESTAMP,
     Seq(),
-    new CurrentTimePointCallGen(false, fallbackLegacyImpl))
+    new CurrentTimePointCallGen(false, fallbackLegacyImpl, isStreamingMode))
 
   addSqlFunction(
     CURRENT_ROW_TIMESTAMP,
@@ -511,12 +515,12 @@ class FunctionGenerator private(config: TableConfig) {
   addSqlFunction(
     LOCALTIME,
     Seq(),
-    new CurrentTimePointCallGen(true))
+    new CurrentTimePointCallGen(true, false, isStreamingMode))
 
   addSqlFunction(
     LOCALTIMESTAMP,
     Seq(),
-    new CurrentTimePointCallGen(true))
+    new CurrentTimePointCallGen(true, false, isStreamingMode))
 
   addSqlFunctionMethod(
     LOG2,

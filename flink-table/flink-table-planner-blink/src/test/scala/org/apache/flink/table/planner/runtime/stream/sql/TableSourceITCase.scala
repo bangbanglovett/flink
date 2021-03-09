@@ -20,12 +20,12 @@ package org.apache.flink.table.planner.runtime.stream.sql
 
 import org.apache.flink.api.scala._
 import org.apache.flink.table.api.bridge.scala._
+import org.apache.flink.table.api.config.ExecutionConfigOptions
 import org.apache.flink.table.planner.factories.TestValuesTableFactory
 import org.apache.flink.table.planner.runtime.utils.{StreamingTestBase, TestData, TestingAppendSink, TestingRetractSink}
 import org.apache.flink.table.planner.utils._
 import org.apache.flink.table.utils.LegacyRowResource
 import org.apache.flink.types.Row
-
 import org.junit.Assert._
 import org.junit.{Before, Rule, Test}
 
@@ -38,12 +38,14 @@ class TableSourceITCase extends StreamingTestBase {
   override def before(): Unit = {
     super.before()
     val myTableDataId = TestValuesTableFactory.registerData(TestData.smallData3)
+//    tEnv.getConfig.getConfiguration.setBoolean(ExecutionConfigOptions.TABLE_EXEC_FALLBACK_LEGACY_TIME_FUNCTION, true)
     tEnv.executeSql(
       s"""
          |CREATE TABLE MyTable (
          |  `a` INT,
          |  `b` BIGINT,
-         |  `c` STRING
+         |  `c` STRING,
+         |   pt as PROCTIME()
          |) WITH (
          |  'connector' = 'values',
          |  'data-id' = '$myTableDataId',
@@ -104,6 +106,35 @@ class TableSourceITCase extends StreamingTestBase {
          |)
          |""".stripMargin
     )
+  }
+
+
+  @Test
+  def testLegacyProctime(): Unit = {
+    val result = tEnv.sqlQuery("SELECT a, c, pt FROM MyTable").toAppendStream[Row]
+    val sink = new TestingAppendSink
+    result.addSink(sink)
+    env.execute()
+
+    val expected = Seq(
+      "1,Hi",
+      "2,Hello",
+      "3,Hello world")
+    assertEquals(expected.sorted, sink.getAppendResults.sorted)
+  }
+
+  @Test
+  def testProctime(): Unit = {
+    val result = tEnv.sqlQuery("SELECT a, c, pt FROM MyTable").toAppendStream[Row]
+    val sink = new TestingAppendSink
+    result.addSink(sink)
+    env.execute()
+
+    val expected = Seq(
+      "1,Hi",
+      "2,Hello",
+      "3,Hello world")
+    assertEquals(expected.sorted, sink.getAppendResults.sorted)
   }
 
   @Test

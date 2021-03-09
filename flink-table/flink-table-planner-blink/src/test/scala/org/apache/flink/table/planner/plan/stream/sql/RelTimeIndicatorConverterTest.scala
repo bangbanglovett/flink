@@ -26,17 +26,19 @@ import org.apache.flink.table.functions.TableFunction
 import org.apache.flink.table.planner.plan.stream.sql.RelTimeIndicatorConverterTest.TableFunc
 import org.apache.flink.table.planner.utils.TableTestBase
 import org.apache.flink.table.types.logical.BigIntType
-
 import org.junit.Test
-
 import java.sql.Timestamp
+
+import org.apache.flink.table.api.config.ExecutionConfigOptions
 
 /**
   * Tests for [[org.apache.flink.table.planner.calcite.RelTimeIndicatorConverter]].
   */
 class RelTimeIndicatorConverterTest extends TableTestBase {
 
-  private val util = streamTestUtil()
+  private val config = new TableConfig
+  config.getConfiguration.setBoolean(ExecutionConfigOptions.TABLE_EXEC_FALLBACK_LEGACY_TIME_FUNCTION, true)
+  private val util = streamTestUtil(config)
   util.addDataStream[(Long, Long, Int)](
     "MyTable", 'rowtime.rowtime, 'long, 'int, 'proctime.proctime)
   util.addDataStream[(Long, Long, Int)]("MyTable1", 'rowtime.rowtime, 'long, 'int)
@@ -54,7 +56,7 @@ class RelTimeIndicatorConverterTest extends TableTestBase {
 
   @Test
   def testSelectAll(): Unit = {
-    util.verifyExecPlan("SELECT * FROM MyTable")
+    util.verifyExecPlan("SELECT proctime FROM MyTable")
   }
 
   @Test

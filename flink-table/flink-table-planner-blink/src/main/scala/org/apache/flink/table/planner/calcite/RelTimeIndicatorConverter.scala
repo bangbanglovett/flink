@@ -26,8 +26,7 @@ import org.apache.flink.table.planner.plan.nodes.calcite._
 import org.apache.flink.table.planner.plan.schema.TimeIndicatorRelDataType
 import org.apache.flink.table.planner.plan.utils.TemporalJoinUtil
 import org.apache.flink.table.planner.plan.utils.WindowUtil.groupingContainsWindowStartEnd
-import org.apache.flink.table.types.logical.TimestampType
-
+import org.apache.flink.table.types.logical.{LocalZonedTimestampType, TimestampType}
 import org.apache.calcite.rel.`type`.RelDataType
 import org.apache.calcite.rel.core._
 import org.apache.calcite.rel.hint.RelHint
@@ -37,7 +36,6 @@ import org.apache.calcite.rex._
 import org.apache.calcite.sql.`type`.SqlTypeName
 import org.apache.calcite.sql.fun.SqlStdOperatorTable
 import org.apache.calcite.sql.fun.SqlStdOperatorTable.FINAL
-
 import java.util.{Collections => JCollections}
 
 import scala.collection.JavaConversions._
@@ -55,6 +53,11 @@ class RelTimeIndicatorConverter(rexBuilder: RexBuilder) extends RelShuttle {
     .getTypeFactory
     .asInstanceOf[FlinkTypeFactory]
     .createFieldTypeFromLogicalType(new TimestampType(isNullable, 3))
+
+  private def localZoneTimestamp(isNullable: Boolean): RelDataType = rexBuilder
+    .getTypeFactory
+    .asInstanceOf[FlinkTypeFactory]
+    .createFieldTypeFromLogicalType(new LocalZonedTimestampType(isNullable, 3))
 
   val materializerUtils = new RexTimeIndicatorMaterializerUtils(rexBuilder)
 

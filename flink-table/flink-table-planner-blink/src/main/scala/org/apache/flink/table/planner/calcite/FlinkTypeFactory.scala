@@ -537,7 +537,13 @@ object FlinkTypeFactory {
         } else {
           new TimestampType(true, TimestampKind.PROCTIME, 3)
         }
-
+      case TIMESTAMP_WITH_LOCAL_TIME_ZONE if relDataType.isInstanceOf[TimeIndicatorRelDataType] =>
+        val indicator = relDataType.asInstanceOf[TimeIndicatorRelDataType]
+        if (indicator.isEventTime) {
+          new LocalZonedTimestampType(true, TimestampKind.ROWTIME, 3)
+        } else {
+          new LocalZonedTimestampType(true, TimestampKind.PROCTIME, 3)
+        }
       // temporal types
       case DATE => new DateType()
       case TIME =>

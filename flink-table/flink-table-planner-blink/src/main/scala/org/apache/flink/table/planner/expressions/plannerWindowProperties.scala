@@ -19,7 +19,7 @@
 package org.apache.flink.table.planner.expressions
 
 import org.apache.flink.table.api.TableException
-import org.apache.flink.table.types.logical.{BigIntType, LogicalType, TimestampKind, TimestampType}
+import org.apache.flink.table.types.logical.{BigIntType, LocalZonedTimestampType, LogicalType, TimestampKind, TimestampType}
 
 trait PlannerWindowProperty {
   def resultType: LogicalType
@@ -80,7 +80,7 @@ case class PlannerProctimeAttribute(reference: PlannerWindowReference)
   extends AbstractPlannerWindowProperty(reference) {
 
   override def resultType: LogicalType =
-    new TimestampType(true, TimestampKind.PROCTIME, 3)
+    new LocalZonedTimestampType(true, TimestampKind.PROCTIME, 3)
 
   override def toString: String = s"proctime($reference)"
 }

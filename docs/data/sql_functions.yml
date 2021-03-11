@@ -415,18 +415,23 @@ temporal:
       NUMERIC.milli
       NUMERIC.millis
     description: Creates an interval of NUMERIC milliseconds.
-  - sql: CURRENT_DATE()
+  - sql: CURRENT_DATE
     table: currentDate()
-    description: Returns the current SQL date in the UTC time zone.
-  - sql: CURRENT_TIME()
+    description: Returns the current SQL date in the local time zone. This function is not deterministic, it would be evaluated for each record in stream job, it would be evaluated once in batch job at query start.
+  - sql: CURRENT_TIME
     table: currentTime()
-    description: Returns the current SQL time in the UTC time zone.
+    description: Returns the current SQL time in the local time zone. This function is not deterministic, it would be evaluated for each record in stream job, it would be evaluated once in batch job at query start.
+  - sql: CURRENT_TIMESTAMP
+    table: currentTimestamp()
+    description: Returns the current SQL timestamp in the local time zone, the return type is TIMESTAMP WITH LOCAL TIME ZONE. This function is not deterministic, it would be evaluated for each record in stream job, it would be evaluated once in batch job at query start.
   - sql: LOCALTIME
     table: localTime()
-    description: Returns the current SQL timestamp in the UTC time zone.
+    description: Returns the current SQL timestamp in the local time zone, this is a synonym of CURRENT_TIME. This function is not deterministic, it would be evaluated for each record in stream job, it would be evaluated once in batch job at query start.
   - sql: LOCALTIMESTAMP
     table: localTimestamp()
-    description: Returns the current SQL timestamp in local time zone.
+    description: Returns the current SQL timestamp in local time zone, the return type is TIMESTAMP. This function is not deterministic, it would be evaluated for each record in stream job, it would be evaluated once in batch job at query start.
+  - sql: NOW()
+    description: Returns the current SQL timestamp in the local time zone, this is a synonym of CURRENT_TIME. This function is not deterministic, it would be evaluated for each record in stream job, it would be evaluated once in batch job at query start.
   - sql: EXTRACT(timeinteravlunit FROM temporal)
     table: TEMPORAL.extract(TIMEINTERVALUNIT)
     description: Returns a long value extracted from the timeintervalunit part of temporal. E.g., EXTRACT(DAY FROM DATE '2006-06-05') returns 5.
@@ -475,8 +480,6 @@ temporal:
     description: Converts a date string string1 with format string2 (by default 'yyyy-MM-dd') to a date.
   - sql: TO_TIMESTAMP(string1[, string2])
     description: "Converts date time string string1 with format string2 (by default: 'yyyy-MM-dd HH:mm:ss') under the session time zone (specified by TableConfig) to a timestamp."
-  - sql: NOW()
-    description: Returns the current SQL timestamp in the UTC time zone. This function is not deterministic which means the value would be recalculated for each record.
 
 conditional:
   - sql: |

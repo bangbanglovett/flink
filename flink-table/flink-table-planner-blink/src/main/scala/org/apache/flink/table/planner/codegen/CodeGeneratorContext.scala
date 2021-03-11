@@ -441,7 +441,10 @@ class CodeGeneratorContext(val tableConfig: TableConfig) {
   }
 
   /**
-    * Adds a reusable timestamp to the beginning of the SAM of the generated class.
+    * Adds a reusable row-level timestamp to the beginning of the SAM of the generated class.
+    *
+    * <p> The timestamp value is evaluated row-level, this
+    * function is generally used for stream job.
     */
   def addReusableTimestamp(): String = {
     val fieldTerm = s"timestamp"
@@ -458,7 +461,24 @@ class CodeGeneratorContext(val tableConfig: TableConfig) {
   }
 
   /**
-    * Adds a reusable time to the beginning of the SAM of the generated [[Function]].
+   * Adds a reusable session-level timestamp to the beginning of the SAM of the generated class.
+   *
+   * <p> The timestamp value is evaluated once for one session, this
+   * function is generally used for batch job.
+   */
+  def addReusableSessionTimestamp(): String = {
+    val fieldTerm = s"sessionTimestamp"
+
+    reusableMemberStatements.add(s"""
+    |private static final $TIMESTAMP_DATA $fieldTerm =
+    |$TIMESTAMP_DATA.fromEpochMillis(java.lang.System.currentTimeMillis());
+    |""".stripMargin)
+    fieldTerm
+  }
+
+  /**
+    * Adds a reusable row-level time to the beginning of the SAM of
+    * the generated [[Function]].
     */
   def addReusableTime(): String = {
     val fieldTerm = s"time"
@@ -478,6 +498,79 @@ class CodeGeneratorContext(val tableConfig: TableConfig) {
          |}
          |""".stripMargin
     reusablePerRecordStatements.add(field)
+    fieldTerm
+  }
+
+  /**
+   * Adds a reusable session-level time to the beginning of the SAM of
+   * the generated [[Function]].
+   */
+  def addReusableSessionTime(): String = {
+    val fieldTerm = s"sessionTime"
+
+    val sessionTimestamp = addReusableSessionTimestamp()
+    reusableMemberStatements.add(
+      s"""
+      |private static final int $fieldTerm = (int)
+      | ($sessionTimestamp.getMillisecond() % ${DateTimeUtils.MILLIS_PER_DAY}) < 0 ?
+      | (int) ($sessionTimestamp.getMillisecond() %
+      | ${DateTimeUtils.MILLIS_PER_DAY}) + ${DateTimeUtils.MILLIS_PER_DAY} :
+      | (int) ($sessionTimestamp.getMillisecond() % ${DateTimeUtils.MILLIS_PER_DAY});
+      |""".stripMargin)
+    fieldTerm
+  }
+
+  /**
+   * Adds a reusable row-level current time to the beginning of the SAM of
+   * the generated [[Function]].
+   */
+  def addReusableCurrentTime(): String = {
+    val fieldTerm = s"currentTime"
+
+    val timestamp = addReusableTimestamp()
+    val sessionTimeZone = addReusableSessionTimeZone()
+
+    // declaration
+    reusableMemberStatements.add(s"private int $fieldTerm;")
+
+    // assignment
+    // adopted from org.apache.calcite.runtime.SqlFunctions.currentTime()
+    val field =
+    s"""
+       |$fieldTerm = (int) (($timestamp.getMillisecond()
+       |  + $sessionTimeZone.getOffset($timestamp.getMillisecond()))
+       |  % ${DateTimeUtils.MILLIS_PER_DAY});
+       |if ($fieldTerm < 0) {
+       |  $fieldTerm += ${DateTimeUtils.MILLIS_PER_DAY};
+       |}
+       |""".stripMargin
+    reusablePerRecordStatements.add(field)
+    fieldTerm
+  }
+
+  /**
+   * Adds a reusable session-level current time to the beginning of the SAM of
+   * the generated [[Function]].
+   */
+  def addReusableSessionCurrentTime(): String = {
+    val fieldTerm = s"sessionCurrentTime"
+
+    val sessionTimestamp = addReusableSessionTimestamp()
+    val sessionTimeZone = addReusableSessionTimeZone()
+
+    reusableMemberStatements.add(
+      s"""
+          |private static final int $fieldTerm =
+          | ((int) (($sessionTimestamp.getMillisecond()
+          |  + $sessionTimeZone.getOffset($sessionTimestamp.getMillisecond()))
+          |  % ${DateTimeUtils.MILLIS_PER_DAY})) < 0 ?
+          | ((int) (($sessionTimestamp.getMillisecond()
+          |  + $sessionTimeZone.getOffset($sessionTimestamp.getMillisecond()))
+          |  % ${DateTimeUtils.MILLIS_PER_DAY}) + ${DateTimeUtils.MILLIS_PER_DAY}) :
+          |  (int) (($sessionTimestamp.getMillisecond()
+          |  + $sessionTimeZone.getOffset($sessionTimestamp.getMillisecond()))
+          |  % ${DateTimeUtils.MILLIS_PER_DAY});
+          |""".stripMargin)
     fieldTerm
   }
 
@@ -505,7 +598,26 @@ class CodeGeneratorContext(val tableConfig: TableConfig) {
   }
 
   /**
-    * Adds a reusable local time to the beginning of the SAM of the generated class.
+   * Adds a reusable session-level local date time to the beginning of
+   * the SAM of the generated class.
+   */
+  def addReusableSessionLocalDateTime(): String = {
+    val fieldTerm = s"sessionLocaltimestamp"
+
+    val sessionTimeZone = addReusableSessionTimeZone()
+    val sessionLocaltimestamp = addReusableSessionTimestamp()
+
+    reusableMemberStatements.add(
+      s"""
+      |private static final $TIMESTAMP_DATA $fieldTerm = $TIMESTAMP_DATA.fromEpochMillis(
+      | $sessionLocaltimestamp.getMillisecond()
+      | + $sessionTimeZone.getOffset($sessionLocaltimestamp.getMillisecond()));
+      |""".stripMargin)
+    fieldTerm
+  }
+
+  /**
+    * Adds a reusable row-level local time to the beginning of the SAM of the generated class.
     */
   def addReusableLocalTime(): String = {
     val fieldTerm = s"localtime"
@@ -526,7 +638,25 @@ class CodeGeneratorContext(val tableConfig: TableConfig) {
   }
 
   /**
-    * Adds a reusable date to the beginning of the SAM of the generated class.
+   * Adds a reusable session-level local time to the beginning of
+   * the SAM of the generated class.
+   */
+  def addReusableSessionLocalTime(): String = {
+    val fieldTerm = s"sessionLocaltime"
+
+    val sessionLocaltimestamp = addReusableSessionLocalDateTime()
+
+    // declaration
+    reusableMemberStatements.add(
+      s"""
+          |private static final int $fieldTerm =
+          | (int) ($sessionLocaltimestamp.getMillisecond() % ${DateTimeUtils.MILLIS_PER_DAY});
+          | """.stripMargin)
+    fieldTerm
+  }
+
+  /**
+    * Adds a reusable row-level date to the beginning of the SAM of the generated class.
     */
   def addReusableDate(): String = {
     val fieldTerm = s"date"
@@ -547,6 +677,77 @@ class CodeGeneratorContext(val tableConfig: TableConfig) {
          |}
          |""".stripMargin
     reusablePerRecordStatements.add(field)
+    fieldTerm
+  }
+
+  /**
+   * Adds a reusable session-level date to the beginning of the SAM of the generated class.
+   */
+  def addReusableSessionDate(): String = {
+    val fieldTerm = s"sessionDate"
+
+    val sessionTimestamp = addReusableSessionTimestamp()
+    val sessionTime = addReusableSessionTime()
+    reusableMemberStatements.add(
+    s"""
+       |private static final int $fieldTerm =
+       | $sessionTime < 0 ?
+       | (int) ($sessionTimestamp.getMillisecond() / ${DateTimeUtils.MILLIS_PER_DAY}) - 1 :
+       | (int) ($sessionTimestamp.getMillisecond() / ${DateTimeUtils.MILLIS_PER_DAY});
+       |""".stripMargin)
+
+    fieldTerm
+  }
+
+  /**
+   * Adds a reusable row-level current date to the beginning of the SAM of the generated class.
+   */
+  def addReusableCurrentDate(): String = {
+    val fieldTerm = s"currentDate"
+
+    val timestamp = addReusableTimestamp()
+    val time = addReusableCurrentTime()
+    val sessionTimeZone = addReusableSessionTimeZone()
+
+    // declaration
+    reusableMemberStatements.add(s"private int $fieldTerm;")
+
+    // assignment
+    // adopted from org.apache.calcite.runtime.SqlFunctions.currentDate()
+    val field =
+    s"""
+       |$fieldTerm = (int) (($timestamp.getMillisecond()
+       |  + $sessionTimeZone.getOffset($timestamp.getMillisecond()))
+       |  / ${DateTimeUtils.MILLIS_PER_DAY});
+       |if ($time < 0) {
+       |  $fieldTerm -= 1;
+       |}
+       |""".stripMargin
+    reusablePerRecordStatements.add(field)
+    fieldTerm
+  }
+
+  /**
+   * Adds a reusable session-level current date to the beginning of the SAM of the generated class.
+   */
+  def addReusableSessionCurrentDate(): String = {
+    val fieldTerm = s"sessionCurrentDate"
+
+    val sessionTimestamp = addReusableSessionTimestamp()
+    val sessionTime = addReusableSessionCurrentTime()
+    val sessionTimeZone = addReusableSessionTimeZone()
+
+    // declaration
+    reusableMemberStatements.add(
+      s"""
+          |private static final int $fieldTerm = $sessionTime < 0 ?
+          | ((int) (($sessionTimestamp.getMillisecond()
+          |  + $sessionTimeZone.getOffset($sessionTimestamp.getMillisecond()))
+          |  / ${DateTimeUtils.MILLIS_PER_DAY}) - 1) :
+          | (int) (($sessionTimestamp.getMillisecond()
+          |  + $sessionTimeZone.getOffset($sessionTimestamp.getMillisecond()))
+          |  / ${DateTimeUtils.MILLIS_PER_DAY});
+          |""".stripMargin)
     fieldTerm
   }
 

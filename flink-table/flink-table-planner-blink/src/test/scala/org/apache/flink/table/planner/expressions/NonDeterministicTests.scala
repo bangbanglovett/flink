@@ -20,14 +20,17 @@ package org.apache.flink.table.planner.expressions
 
 import java.sql.Time
 import java.time.format.DateTimeFormatter
-import java.time.{LocalDateTime, ZoneId}
+import java.time.{LocalDate, LocalDateTime, ZoneId}
 
+import org.apache.flink.api.common.RuntimeExecutionMode
 import org.apache.flink.api.java.typeutils.RowTypeInfo
+import org.apache.flink.configuration.ExecutionOptions
 import org.apache.flink.table.api._
 import org.apache.flink.table.functions.ScalarFunction
 import org.apache.flink.table.planner.expressions.utils.ExpressionTestBase
 import org.apache.flink.types.Row
 
+import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
@@ -36,36 +39,124 @@ import org.junit.Test
 class NonDeterministicTests extends ExpressionTestBase {
 
   @Test
-  def testCurrentDate(): Unit = {
+  def testCurrentDateTime(): Unit = {
     testAllApis(
       currentDate().isGreater("1970-01-01".toDate),
-      "currentDate() > '1970-01-01'.toDate",
       "CURRENT_DATE > DATE '1970-01-01'",
       "true")
-  }
 
-  @Test
-  def testCurrentTime(): Unit = {
     testAllApis(
       currentTime().isGreaterOrEqual("00:00:00".toTime),
-      "currentTime() >= '00:00:00'.toTime",
       "CURRENT_TIME >= TIME '00:00:00'",
       "true")
-  }
 
-  @Test
-  def testCurrentTimestamp(): Unit = {
     testAllApis(
-      currentTimestamp().isGreater("1970-01-01 00:00:00".toTimestamp),
-      "currentTimestamp() > '1970-01-01 00:00:00'.toTimestamp",
-      "CURRENT_TIMESTAMP > TIMESTAMP '1970-01-01 00:00:00'",
+      currentTimestamp().isGreater(
+        "1970-01-01 00:00:00".cast(DataTypes.TIMESTAMP_WITH_LOCAL_TIME_ZONE())),
+      s"CURRENT_TIMESTAMP > ${timestampLtz("1970-01-01 00:00:00")}",
+      "true")
+
+    testSqlApi(s"NOW() > ${timestampLtz("1970-01-01 00:00:00")}",
       "true")
   }
 
   @Test
-  def testNow(): Unit = {
+  def testCurrentDateTimeInStreamMode(): Unit = {
+    val temporalFunctions = getGeneratedFunction(List(
+      "CURRENT_DATE",
+      "CURRENT_TIME",
+      "CURRENT_TIMESTAMP",
+      "NOW()",
+      "LOCALTIME",
+      "LOCALTIMESTAMP"))
+    val result1 = evaluateFunction(temporalFunctions)
+    Thread.sleep(1 * 1000L)
+    val result2: List[String] = evaluateFunction(temporalFunctions)
+    assert(result1.toString() < result2.toString())
+    cleanExprs()
+  }
+
+
+  @Test
+  def testCurrentDateTimeInBatchMode(): Unit = {
+    config.getConfiguration.set(ExecutionOptions.RUNTIME_MODE, RuntimeExecutionMode.BATCH)
+    val temporalFunctions = getGeneratedFunction(List(
+      "CURRENT_DATE",
+      "CURRENT_TIME",
+      "CURRENT_TIMESTAMP",
+      "NOW()",
+      "LOCALTIME",
+      "LOCALTIMESTAMP"))
+    val result1 = evaluateFunction(temporalFunctions)
+    Thread.sleep(1 * 1000L)
+    val result2: List[String] = evaluateFunction(temporalFunctions)
+    assertEquals(result1, result2)
+    cleanExprs()
+  }
+
+  @Test
+  def testCurrentTimestampInUTC(): Unit = {
+    config.setLocalTimeZone(ZoneId.of("UTC"))
+    val localDateTime = LocalDateTime.now(ZoneId.of("UTC"))
+
+    val formattedCurrentDate = localDateTime
+      .format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
+    val formattedCurrentTime = localDateTime
+      .toLocalTime
+      .format(DateTimeFormatter.ofPattern("HH:mm:ss"))
+    val formattedCurrentTimestamp = localDateTime
+      .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+
+    // the CURRENT_DATE/CURRENT_TIME/CURRENT_TIMESTAMP/NOW() functions are
+    // not deterministic, thus we
+    // use following pattern to check the returned SQL timestamp in session time zone UTC
     testSqlApi(
-      "NOW() > TIMESTAMP '1970-01-01 00:00:00'",
+      s"DATE_SUB(CURRENT_DATE, DATE '$formattedCurrentDate') = 0",
+      "true")
+
+    testSqlApi(
+      s"TIME_SUB(CURRENT_TIME, TIME '$formattedCurrentTime') <= 60000",
+      "true")
+
+    testSqlApi(
+      s"TIMESTAMPDIFF(SECOND, ${timestampLtz(formattedCurrentTimestamp)}, CURRENT_TIMESTAMP) <= 60",
+      "true")
+
+    testSqlApi(
+      s"TIMESTAMPDIFF(SECOND, ${timestampLtz(formattedCurrentTimestamp)}, NOW()) <= 60",
+      "true")
+  }
+
+  @Test
+  def testCurrentTimestampInShanghai(): Unit = {
+    config.setLocalTimeZone(ZoneId.of("Asia/Shanghai"))
+    val localDateTime = LocalDateTime.now(ZoneId.of("Asia/Shanghai"))
+
+    val formattedCurrentDate = localDateTime
+      .format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
+    val formattedCurrentTime = localDateTime
+      .toLocalTime
+      .format(DateTimeFormatter.ofPattern("HH:mm:ss"))
+    val formattedCurrentTimestamp = localDateTime
+      .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+
+    // the CURRENT_DATE/CURRENT_TIME/CURRENT_TIMESTAMP/NOW() functions are
+    // not deterministic, thus we use following pattern to check the returned
+    // SQL timestamp in session time zone UTC
+    testSqlApi(
+      s"DATE_SUB(CURRENT_DATE, DATE '$formattedCurrentDate') = 0",
+      "true")
+
+    testSqlApi(
+      s"TIME_SUB(CURRENT_TIME, TIME '$formattedCurrentTime') <= 60000",
+      "true")
+
+    testSqlApi(
+      s"TIMESTAMPDIFF(SECOND, ${timestampLtz(formattedCurrentTimestamp)}, CURRENT_TIMESTAMP) <= 60",
+      "true")
+
+    testSqlApi(
+      s"TIMESTAMPDIFF(SECOND, ${timestampLtz(formattedCurrentTimestamp)}, NOW()) <= 60",
       "true")
   }
 
@@ -81,9 +172,9 @@ class NonDeterministicTests extends ExpressionTestBase {
       .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
 
     // the LOCALTIME/LOCALTIMESTAMP functions are not deterministic, thus we
-    // use following pattern to check it return SQL timestamp in session time zone UTC
+    // use following pattern to check the returned SQL timestamp in session time zone UTC
     testSqlApi(
-      s"TIMESUB(LOCALTIME, TIME '$formattedLocalTime') <= 60000",
+      s"TIME_SUB(LOCALTIME, TIME '$formattedLocalTime') <= 60000",
       "true")
     testSqlApi(
       s"TIMESTAMPDIFF(SECOND, TIMESTAMP '$formattedLocalDateTime', LOCALTIMESTAMP) <= 60",
@@ -102,21 +193,12 @@ class NonDeterministicTests extends ExpressionTestBase {
       .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
 
     // the LOCALTIME/LOCALTIMESTAMP functions are not deterministic, thus we
-    // use following pattern to check it return SQL timestamp in session time zone Shanghai
+    // use following pattern to check the returned SQL timestamp in session time zone Shanghai
     testSqlApi(
-      s"TIMESUB(LOCALTIME, TIME '$formattedLocalTime') <= 60000",
+      s"TIME_SUB(LOCALTIME, TIME '$formattedLocalTime') <= 60000",
       "true")
     testSqlApi(
       s"TIMESTAMPDIFF(SECOND, TIMESTAMP '$formattedLocalDateTime', LOCALTIMESTAMP) <= 60",
-      "true")
-  }
-
-  @Test
-  def testLocalTime(): Unit = {
-    testAllApis(
-      localTime().isGreaterOrEqual("00:00:00".toTime),
-      "localTime() >= '00:00:00'.toTime",
-      "LOCALTIME >= TIME '00:00:00'",
       "true")
   }
 
@@ -136,7 +218,8 @@ class NonDeterministicTests extends ExpressionTestBase {
   override def typeInfo: RowTypeInfo = new RowTypeInfo()
 
   override def functions: Map[String, ScalarFunction] = Map(
-    "TIMESUB" -> TimeDiffFun
+    "TIME_SUB" -> TimeDiffFun,
+    "DATE_SUB" -> DateDiffFun
   )
 }
 
@@ -154,5 +237,12 @@ object TimeDiffFun extends ScalarFunction {
     else {
       t1.getTime - t2.getTime
     }
+  }
+}
+
+object DateDiffFun extends ScalarFunction {
+
+  def eval(d1: LocalDate, d2: LocalDate): Long = {
+    d1.toEpochDay - d2.toEpochDay
   }
 }

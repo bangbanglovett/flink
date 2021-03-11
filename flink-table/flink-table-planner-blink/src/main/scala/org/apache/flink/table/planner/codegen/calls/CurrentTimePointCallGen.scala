@@ -21,37 +21,66 @@ package org.apache.flink.table.planner.codegen.calls
 import org.apache.flink.table.planner.codegen.GenerateUtils.generateNonNullField
 import org.apache.flink.table.planner.codegen.{CodeGeneratorContext, GeneratedExpression}
 import org.apache.flink.table.types.logical.LogicalType
-import org.apache.flink.table.types.logical.LogicalTypeRoot.{DATE, TIMESTAMP_WITHOUT_TIME_ZONE, TIME_WITHOUT_TIME_ZONE}
+import org.apache.flink.table.types.logical.LogicalTypeRoot.{DATE, TIMESTAMP_WITHOUT_TIME_ZONE,TIMESTAMP_WITH_LOCAL_TIME_ZONE, TIME_WITHOUT_TIME_ZONE}
 
 /**
   * Generates function call to determine current time point (as date/time/timestamp) in
   * local timezone or not.
   */
-class CurrentTimePointCallGen(local: Boolean) extends CallGenerator {
+class CurrentTimePointCallGen(local: Boolean, isStreaming: Boolean = true) extends CallGenerator {
 
   override def generate(
       ctx: CodeGeneratorContext,
       operands: Seq[GeneratedExpression],
       returnType: LogicalType): GeneratedExpression = returnType.getTypeRoot match {
-    case TIME_WITHOUT_TIME_ZONE if local =>
+    // LOCALTIME in Streaming mode
+    case TIME_WITHOUT_TIME_ZONE if local && isStreaming =>
       val time = ctx.addReusableLocalTime()
       generateNonNullField(returnType, time)
 
-    case TIMESTAMP_WITHOUT_TIME_ZONE if local =>
+    // LOCALTIME in Batch mode
+    case TIME_WITHOUT_TIME_ZONE if local && !isStreaming =>
+      val time = ctx.addReusableSessionLocalTime()
+      generateNonNullField(returnType, time)
+
+    // LOCALTIMESTAMP in Streaming mode
+    case TIMESTAMP_WITHOUT_TIME_ZONE if local && isStreaming =>
       val timestamp = ctx.addReusableLocalDateTime()
       generateNonNullField(returnType, timestamp)
 
-    case DATE =>
+    // LOCALTIMESTAMP in Batch mode
+    case TIMESTAMP_WITHOUT_TIME_ZONE if local && !isStreaming =>
+      val timestamp = ctx.addReusableSessionLocalDateTime()
+      generateNonNullField(returnType, timestamp)
+
+    // CURRENT_DATE in Streaming mode
+    case DATE if isStreaming =>
       val date = ctx.addReusableDate()
       generateNonNullField(returnType, date)
 
-    case TIME_WITHOUT_TIME_ZONE =>
+    // CURRENT_DATE in Batch mode
+    case DATE if !isStreaming =>
+      val date = ctx.addReusableSessionDate()
+      generateNonNullField(returnType, date)
+
+    // CURRENT_TIME in Streaming mode
+    case TIME_WITHOUT_TIME_ZONE if isStreaming =>
       val time = ctx.addReusableTime()
       generateNonNullField(returnType, time)
 
-    case TIMESTAMP_WITHOUT_TIME_ZONE =>
-      // TODO CURRENT_TIMESTAMP should return TIMESTAMP WITH TIME ZONE
+    // CURRENT_TIME in Batch mode
+    case TIME_WITHOUT_TIME_ZONE if !isStreaming =>
+      val time = ctx.addReusableSessionTime()
+      generateNonNullField(returnType, time)
+
+    // CURRENT_TIMESTAMP in Streaming mode
+    case TIMESTAMP_WITH_LOCAL_TIME_ZONE if isStreaming =>
       val timestamp = ctx.addReusableTimestamp()
+      generateNonNullField(returnType, timestamp)
+
+    // CURRENT_TIMESTAMP in Batch mode
+    case TIMESTAMP_WITH_LOCAL_TIME_ZONE if !isStreaming =>
+      val timestamp = ctx.addReusableSessionTimestamp()
       generateNonNullField(returnType, timestamp)
   }
 

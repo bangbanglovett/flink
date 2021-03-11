@@ -421,35 +421,41 @@ trait ImplicitExpressionConversions {
   }
 
   /**
-    * Returns the current SQL date in UTC time zone.
+    * Returns the current SQL date in local time zone,
+    * the underlying function return type is [[DataTypes.DATE]].
     */
   def currentDate(): Expression = {
     Expressions.currentDate()
   }
 
   /**
-    * Returns the current SQL time in UTC time zone.
+    * Returns the current SQL time in local time zone,
+    * the underlying function return type is [[DataTypes.TIME]].
     */
   def currentTime(): Expression = {
     Expressions.currentTime()
   }
 
   /**
-    * Returns the current SQL timestamp in UTC time zone.
+    * Returns the current SQL timestamp in local time zone,
+    * the underlying function return type is [[DataTypes.TIMESTAMP_WITH_LOCAL_TIME_ZONE()]].
     */
   def currentTimestamp(): Expression = {
     Expressions.currentTimestamp()
   }
 
   /**
-    * Returns the current SQL time in local time zone.
+    * Returns the current SQL time in local time zone,
+    * the underlying function return type is [[DataTypes.TIME]],
+    * this is a synonym for [[ImplicitExpressionConversions.currentTime()]].
     */
   def localTime(): Expression = {
     Expressions.localTime()
   }
 
   /**
-    * Returns the current SQL timestamp in local time zone.
+    * Returns the current SQL timestamp in local time zone,
+    * the underlying function return type is [[DataTypes.TIMESTAMP]].
     */
   def localTimestamp(): Expression = {
     Expressions.localTimestamp()

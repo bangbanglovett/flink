@@ -18,6 +18,7 @@
 
 package org.apache.flink.table.planner.expressions.utils
 
+import java.util
 import java.util.Collections
 
 import org.apache.calcite.plan.hep.{HepPlanner, HepProgramBuilder}
@@ -54,6 +55,7 @@ import org.junit.{After, Before, Rule}
 
 import scala.collection.mutable
 import scala.collection.JavaConverters._
+import scala.collection.mutable.ListBuffer
 
 abstract class ExpressionTestBase {
 
@@ -108,6 +110,27 @@ abstract class ExpressionTestBase {
 
   @After
   def evaluateExprs(): Unit = {
+    val mapper = getCodeGenFunction
+    val result = evaluateFunctionResult(mapper)
+    // compare
+    testExprs
+      .zipWithIndex
+      .foreach {
+        case ((originalExpr, optimizedExpr, expected), index) =>
+
+          // adapt string result
+          val actual = result(index)
+
+          val original = if (originalExpr == null) "" else s"for: [$originalExpr]"
+
+          assertEquals(
+            s"Wrong result $original optimized to: [$optimizedExpr]",
+            expected,
+            if (actual == null) "null" else actual)
+      }
+  }
+
+  private def getCodeGenFunction(): MapFunction[RowData, BinaryRowData] = {
     val ctx = CodeGeneratorContext(config)
     val inputType = if (containsLegacyTypes) {
       fromTypeInfoToLogicalType(typeInfo)
@@ -139,9 +162,11 @@ abstract class ExpressionTestBase {
       bodyCode,
       resultType,
       inputType)
+    genFunc.newInstance(getClass.getClassLoader)
+  }
 
-    val mapper = genFunc.newInstance(getClass.getClassLoader)
-
+  private def evaluateFunctionResult(mapper: MapFunction[RowData, BinaryRowData])
+  : List[String] = {
     val isRichFunction = mapper.isInstanceOf[RichFunction]
 
     // call setRuntimeContext method and open method for RichFunction
@@ -169,7 +194,6 @@ abstract class ExpressionTestBase {
         .asInstanceOf[DataStructureConverter[RowData, Row]]
       converter.toInternalOrNull(testData)
     }
-
     val result = mapper.map(testRow)
 
     // call close method for RichFunction
@@ -177,26 +201,32 @@ abstract class ExpressionTestBase {
       mapper.asInstanceOf[RichMapFunction[_, _]].close()
     }
 
-    // compare
-    testExprs
-      .zipWithIndex
-      .foreach {
-        case ((originalExpr, optimizedExpr, expected), index) =>
-
-          // adapt string result
-          val actual = if(!result.asInstanceOf[BinaryRowData].isNullAt(index)) {
-            result.asInstanceOf[BinaryRowData].getString(index).toString
-          } else {
-            null
-          }
-
-          val original = if (originalExpr == null) "" else s"for: [$originalExpr]"
-
-          assertEquals(
-            s"Wrong result $original optimized to: [$optimizedExpr]",
-            expected,
-            if (actual == null) "null" else actual)
+    val resultList = new ListBuffer[String]()
+    for (index <- 0 to testExprs.length - 1) {
+      val actual = if (!result.asInstanceOf[BinaryRowData].isNullAt(index)) {
+        result.asInstanceOf[BinaryRowData].getString(index).toString
+      } else {
+        null
       }
+      resultList += actual
+    }
+    resultList.toList
+  }
+
+  def getGeneratedFunction(sqlExprs: List[String]) : MapFunction[RowData, BinaryRowData] = {
+      sqlExprs.foreach(
+        sqlExpr => addSqlTestExpr(sqlExpr, null))
+      getCodeGenFunction()
+  }
+
+  def evaluateFunction (mapper: MapFunction[RowData, BinaryRowData])
+  : List[String] = {
+    val result = evaluateFunctionResult(mapper)
+    result
+  }
+
+  def cleanExprs(): Unit = {
+    testExprs.clear()
   }
 
   private def addSqlTestExpr(sqlExpr: String, expected: String): Unit = {
@@ -299,5 +329,26 @@ abstract class ExpressionTestBase {
       expected: String): Unit = {
     addTableApiTestExpr(expr, expected)
     addTableApiTestExpr(exprString, expected)
+  }
+
+  //Utils to construct a TIMESTAMP_LTZ type data
+  def timestampLtz(str: String): String = {
+    val precision = extractPrecision(str)
+    timestampLtz(str, precision)
+  }
+
+  def timestampLtz(str: String, precision: Int): String = {
+    s"CAST(TIMESTAMP '$str' AS TIMESTAMP($precision) WITH LOCAL TIME ZONE)"
+  }
+
+  // According to SQL standard, the length of second fraction is
+  // the precision of the Timestamp literal
+  private def extractPrecision(str: String): Int = {
+    val dot = str.indexOf('.')
+    if (dot == -1) {
+      0
+    } else {
+      str.length - dot - 1
+    }
   }
 }

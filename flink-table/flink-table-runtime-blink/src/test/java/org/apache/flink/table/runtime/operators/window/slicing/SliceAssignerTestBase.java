@@ -25,7 +25,10 @@ import org.apache.flink.table.data.writer.BinaryRowWriter;
 
 import org.apache.flink.shaded.guava18.com.google.common.collect.Lists;
 
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
+import java.util.TimeZone;
 
 import static org.apache.flink.core.testutils.FlinkMatchers.containsMessage;
 import static org.junit.Assert.assertThat;
@@ -85,5 +88,12 @@ public abstract class SliceAssignerTestBase {
             this.mergeResult = mergeResult;
             this.toBeMerged = Lists.newArrayList(toBeMerged);
         }
+    }
+
+    /** Get epoch mills from a timestamp string and the time zone the timestamp belonged to. */
+    protected static long epochMills(TimeZone timeZone, String timestampStr) {
+        LocalDateTime localDateTime = LocalDateTime.parse(timestampStr);
+        ZoneOffset zoneOffset = timeZone.toZoneId().getRules().getOffset(localDateTime);
+        return localDateTime.toInstant(zoneOffset).toEpochMilli();
     }
 }

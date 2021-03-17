@@ -31,6 +31,9 @@ import org.apache.calcite.util.Litmus
 import java.util
 import java.util.function.Supplier
 
+import org.apache.calcite.rel.`type`.RelDataType
+import org.apache.calcite.sql.`type`.SqlTypeName
+
 /**
   * Sub-class of [[Snapshot]] that is a relational expression which returns
   * the contents of a relation expression as it was at a given time in the past.
@@ -59,7 +62,14 @@ class FlinkLogicalSnapshot(
       case _ =>
         return litmus.fail(String.format(msg, s"an expression call '${period.toString}'"))
     }
-    super.isValid(litmus, context)
+    val dataType: RelDataType = period.getType
+    if (!(dataType.getSqlTypeName == SqlTypeName.TIMESTAMP ||
+      dataType.getSqlTypeName == SqlTypeName.TIMESTAMP_WITH_LOCAL_TIME_ZONE)) {
+      litmus.fail("The system time period specification expects" +
+        " Timestamp type but is '" + dataType.getSqlTypeName + "'")
+    } else {
+      litmus.succeed
+    }
   }
 
   override def copy(

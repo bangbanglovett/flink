@@ -641,7 +641,7 @@ class TableEnvironmentITCase(tableEnvName: String, isStreaming: Boolean) extends
     assertEquals(
       TableSchema.builder()
         .field("name", DataTypes.STRING())
-        .field("pt", DataTypes.TIMESTAMP(3))
+        .field("pt", DataTypes.TIMESTAMP_LTZ(3))
         .build(),
       tableResult.getTableSchema)
     val it = tableResult.collect()

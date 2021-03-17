@@ -25,9 +25,9 @@ import org.apache.flink.table.api.TableSchema;
 import org.apache.flink.table.expressions.ResolvedExpression;
 import org.apache.flink.table.expressions.utils.ResolvedExpressionMock;
 import org.apache.flink.table.types.DataType;
+import org.apache.flink.table.types.logical.LocalZonedTimestampType;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.TimestampKind;
-import org.apache.flink.table.types.logical.TimestampType;
 import org.apache.flink.table.types.utils.DataTypeFactoryMock;
 import org.apache.flink.table.utils.ExpressionResolverMocks;
 
@@ -64,7 +64,8 @@ public class SchemaResolutionTest {
 
     private static final ResolvedExpression PROCTIME_RESOLVED =
             new ResolvedExpressionMock(
-                    fromLogicalToDataType(new TimestampType(false, TimestampKind.PROCTIME, 3)),
+                    fromLogicalToDataType(
+                            new LocalZonedTimestampType(false, TimestampKind.PROCTIME, 3)),
                     () -> PROCTIME_SQL);
 
     private static final Schema SCHEMA =

@@ -23,13 +23,13 @@ import org.apache.flink.table.planner.calcite.{FlinkTypeFactory, RelTimeIndicato
 import org.apache.flink.table.planner.codegen._
 import org.apache.flink.table.planner.plan.nodes.exec.spec.IntervalJoinSpec.WindowBounds
 import org.apache.flink.table.planner.plan.schema.TimeIndicatorRelDataType
-
 import org.apache.calcite.plan.RelOptUtil
 import org.apache.calcite.rel.`type`.RelDataType
 import org.apache.calcite.rex._
 import org.apache.calcite.sql.SqlKind
-
 import java.util
+
+import org.apache.calcite.util.TimestampString
 
 import scala.collection.JavaConversions._
 
@@ -406,7 +406,7 @@ object IntervalJoinUtil {
           rexBuilder.makeCall(c.getType, c.getOperator, newOps)
         case i: RexInputRef if FlinkTypeFactory.isTimeIndicatorType(i.getType) =>
           // replace with timestamp
-          rexBuilder.makeZeroLiteral(expr.getType)
+            rexBuilder.makeZeroLiteral(expr.getType)
         case _ => expr
       }
     }

@@ -26,14 +26,12 @@ import org.apache.flink.table.planner.functions.sql.{FlinkSqlOperatorTable, SqlW
 import org.apache.flink.table.planner.plan.`trait`.RelWindowProperties
 import org.apache.flink.table.planner.plan.logical.{CumulativeWindowSpec, HoppingWindowSpec, TimeAttributeWindowingStrategy, TumblingWindowSpec}
 import org.apache.flink.table.planner.plan.metadata.FlinkRelMetadataQuery
-import org.apache.flink.table.types.logical.TimestampType
-
+import org.apache.flink.table.types.logical.{IntType, LocalZonedTimestampType, TimestampType}
 import org.apache.calcite.rel.`type`.RelDataType
 import org.apache.calcite.rel.core.Calc
 import org.apache.calcite.rex._
 import org.apache.calcite.sql.SqlKind
 import org.apache.calcite.sql.`type`.SqlTypeFamily
-
 import java.time.Duration
 
 import scala.collection.JavaConversions._
@@ -176,7 +174,15 @@ object WindowUtil {
       throw new ValidationException("Window can only be defined on a time attribute column, " +
         "but is type of " + fieldType)
     }
-    val timeAttributeType = FlinkTypeFactory.toLogicalType(fieldType).asInstanceOf[TimestampType]
+    val timeAttributeType = FlinkTypeFactory.toLogicalType(fieldType) match {
+      case timestampType: TimestampType =>
+        timestampType
+      case timestampLtzType: LocalZonedTimestampType =>
+        timestampLtzType
+      case _ => throw new ValidationException("The supported time indicator type are" +
+        " timestamp and timestampLtz, but is " + FlinkTypeFactory.toLogicalType(fieldType)
+        + ", please file an issue.")
+    }
 
     val windowFunction = windowCall.getOperator.asInstanceOf[SqlWindowTableFunction]
     val windowSpec = windowFunction match {

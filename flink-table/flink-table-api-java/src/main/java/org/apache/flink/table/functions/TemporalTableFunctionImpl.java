@@ -75,8 +75,14 @@ public final class TemporalTableFunctionImpl extends TemporalTableFunction {
         final TableSchema tableSchema =
                 TableSchema.fromResolvedSchema(underlyingHistoryTable.getResolvedSchema());
         return TypeInference.newBuilder()
-                .inputTypeStrategy(InputTypeStrategies.explicitSequence(DataTypes.TIMESTAMP(3)))
-                .outputTypeStrategy(TypeStrategies.explicit(tableSchema.toRowDataType()))
+                .inputTypeStrategy(
+                        InputTypeStrategies.or(
+                                InputTypeStrategies.sequence(
+                                        InputTypeStrategies.explicit(DataTypes.TIMESTAMP(3))),
+                                InputTypeStrategies.sequence(
+                                        InputTypeStrategies.explicit(DataTypes.TIMESTAMP_LTZ(3)))))
+                .outputTypeStrategy(
+                        TypeStrategies.explicit(tableSchema.toRowDataType()))
                 .build();
     }
 

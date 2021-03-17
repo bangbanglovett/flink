@@ -108,4 +108,48 @@ public final class FlinkCalciteSqlValidator extends SqlValidatorImpl {
         // this makes it possible to ignore them in the validator and fall back to regular row types
         // see also SqlFunction#deriveType
     }
+
+    //    @Override
+    //    public void validateQuery(SqlNode node, SqlValidatorScope scope, RelDataType
+    // targetRowType) {
+    //        if (node.getKind() == SqlKind.SNAPSHOT) {
+    //            final SqlValidatorNamespace ns = getNamespace(node);
+    //            validateNamespace(ns, targetRowType);
+    //            validateSnapshot(node, scope, ns);
+    //        } else {
+    //            super.validateQuery(node, scope, targetRowType);
+    //        }
+    //    }
+    //
+    //    /**
+    //     * Validates snapshot to a table.
+    //     *
+    //     * <p>Flink enables TIMESTAMP and TIMESTAMP_LTZ for system time period specification type.
+    //     *
+    //     * @param node The node to validate
+    //     * @param scope Validator scope to derive type
+    //     * @param ns The namespace to lookup table
+    //     */
+    //    private void validateSnapshot(SqlNode node, SqlValidatorScope scope, SqlValidatorNamespace
+    // ns) {
+    //        if (node.getKind() == SqlKind.SNAPSHOT) {
+    //            SqlSnapshot snapshot = (SqlSnapshot) node;
+    //            SqlNode period = snapshot.getPeriod();
+    //            RelDataType dataType = deriveType(scope, period);
+    //            if (!(dataType.getSqlTypeName() == SqlTypeName.TIMESTAMP
+    //                    || dataType.getSqlTypeName() ==
+    // SqlTypeName.TIMESTAMP_WITH_LOCAL_TIME_ZONE)) {
+    //                throw newValidationError(
+    //                        period,
+    //                        Static.RESOURCE.illegalExpressionForTemporal(
+    //                                dataType.getSqlTypeName().getName()));
+    //            }
+    //            if (!ns.getTable().isTemporal()) {
+    //                List<String> qualifiedName = ns.getTable().getQualifiedName();
+    //                String tableName = qualifiedName.get(qualifiedName.size() - 1);
+    //                throw newValidationError(
+    //                        snapshot.getTableRef(), Static.RESOURCE.notTemporalTable(tableName));
+    //            }
+    //        }
+    //    }
 }

@@ -57,6 +57,7 @@ import org.apache.flink.table.runtime.types.LogicalTypeDataTypeConverter;
 import org.apache.flink.table.runtime.typeutils.InternalTypeInfo;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.LogicalType;
+import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.table.types.logical.RowType;
 
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonCreator;
@@ -69,6 +70,7 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.TimeZone;
 
 import static org.apache.flink.util.Preconditions.checkArgument;
 import static org.apache.flink.util.Preconditions.checkNotNull;
@@ -150,7 +152,17 @@ public class StreamExecWindowAggregate extends ExecNodeBase<RowData>
         final RowType inputRowType = (RowType) inputEdge.getOutputType();
 
         final TableConfig config = planner.getTableConfig();
-        final SliceAssigner sliceAssigner = createSliceAssigner(windowing);
+
+        // assign window based on the local time zone if time attribute type is TIMESTAMP_LTZ
+        final boolean isTimestampLtzTimeAttribute =
+                windowing.getTimeAttributeType().getTypeRoot()
+                        == LogicalTypeRoot.TIMESTAMP_WITH_LOCAL_TIME_ZONE;
+        final int timeZoneOffset =
+                isTimestampLtzTimeAttribute
+                        ? TimeZone.getTimeZone(config.getLocalTimeZone()).getRawOffset()
+                        : 0;
+
+        final SliceAssigner sliceAssigner = createSliceAssigner(windowing, timeZoneOffset);
 
         // Hopping window requires additional COUNT(*) to determine whether to register next timer
         // through whether the current fired window is empty, see SliceSharedWindowAggProcessor.
@@ -241,13 +253,15 @@ public class StreamExecWindowAggregate extends ExecNodeBase<RowData>
     // Utilities
     // ------------------------------------------------------------------------------------------
 
-    private static SliceAssigner createSliceAssigner(WindowingStrategy windowingStrategy) {
+    private static SliceAssigner createSliceAssigner(
+            WindowingStrategy windowingStrategy, long timeZoneOffset) {
         WindowSpec windowSpec = windowingStrategy.getWindow();
         if (windowingStrategy instanceof WindowAttachedWindowingStrategy) {
             int windowEndIndex =
                     ((WindowAttachedWindowingStrategy) windowingStrategy).getWindowEnd();
             // we don't need time attribute to assign windows, use a magic value in this case
-            SliceAssigner innerAssigner = createSliceAssigner(windowSpec, Integer.MAX_VALUE);
+            SliceAssigner innerAssigner =
+                    createSliceAssigner(windowSpec, Integer.MAX_VALUE, timeZoneOffset);
             return SliceAssigners.windowed(windowEndIndex, innerAssigner);
 
         } else if (windowingStrategy instanceof TimeAttributeWindowingStrategy) {
@@ -259,7 +273,7 @@ public class StreamExecWindowAggregate extends ExecNodeBase<RowData>
             } else {
                 timeAttributeIndex = -1;
             }
-            return createSliceAssigner(windowSpec, timeAttributeIndex);
+            return createSliceAssigner(windowSpec, timeAttributeIndex, timeZoneOffset);
 
         } else {
             throw new UnsupportedOperationException(windowingStrategy + " is not supported yet.");
@@ -267,10 +281,10 @@ public class StreamExecWindowAggregate extends ExecNodeBase<RowData>
     }
 
     private static SliceAssigner createSliceAssigner(
-            WindowSpec windowSpec, int timeAttributeIndex) {
+            WindowSpec windowSpec, int timeAttributeIndex, long timeZoneOffset) {
         if (windowSpec instanceof TumblingWindowSpec) {
             Duration size = ((TumblingWindowSpec) windowSpec).getSize();
-            return SliceAssigners.tumbling(timeAttributeIndex, size);
+            return SliceAssigners.tumbling(timeAttributeIndex, timeZoneOffset, size);
 
         } else if (windowSpec instanceof HoppingWindowSpec) {
             Duration size = ((HoppingWindowSpec) windowSpec).getSize();
@@ -282,7 +296,7 @@ public class StreamExecWindowAggregate extends ExecNodeBase<RowData>
                                         + "integral multiple of slide, but got size %s ms and slide %s ms",
                                 size.toMillis(), slide.toMillis()));
             }
-            return SliceAssigners.hopping(timeAttributeIndex, size, slide);
+            return SliceAssigners.hopping(timeAttributeIndex, timeZoneOffset, size, slide);
 
         } else if (windowSpec instanceof CumulativeWindowSpec) {
             Duration maxSize = ((CumulativeWindowSpec) windowSpec).getMaxSize();
@@ -294,7 +308,7 @@ public class StreamExecWindowAggregate extends ExecNodeBase<RowData>
                                         + "integral multiple of step, but got maxSize %s ms and step %s ms",
                                 maxSize.toMillis(), step.toMillis()));
             }
-            return SliceAssigners.cumulative(timeAttributeIndex, maxSize, step);
+            return SliceAssigners.cumulative(timeAttributeIndex, timeZoneOffset, maxSize, step);
 
         } else {
             throw new UnsupportedOperationException(windowSpec + " is not supported yet.");

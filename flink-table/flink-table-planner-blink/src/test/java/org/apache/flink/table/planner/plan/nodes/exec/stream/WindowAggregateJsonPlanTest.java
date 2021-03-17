@@ -85,7 +85,7 @@ public class WindowAggregateJsonPlanTest extends TableTestBase {
         String sinkTableDdl =
                 "CREATE TABLE MySink (\n"
                         + " b BIGINT,\n"
-                        + " window_end TIMESTAMP(3),\n"
+                        + " window_end TIMESTAMP_LTZ(3),\n"
                         + " cnt BIGINT\n"
                         + ") WITH (\n"
                         + " 'connector' = 'values')\n";

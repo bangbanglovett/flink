@@ -25,12 +25,13 @@ import org.apache.flink.table.data.writer.BinaryRowWriter;
 
 import org.apache.flink.shaded.guava18.com.google.common.collect.Lists;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.TimeZone;
 
 import static org.apache.flink.core.testutils.FlinkMatchers.containsMessage;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
 
@@ -90,10 +91,30 @@ public abstract class SliceAssignerTestBase {
         }
     }
 
+    protected static void assertSliceStartEnd(
+            String start,
+            String end,
+            long epochMills,
+            SliceAssigner assigner,
+            TimeZone timeZoneOfWindow) {
+
+        assertEquals(
+                start,
+                localTimestampStr(
+                        assigner.getWindowStart(assignSliceEnd(assigner, epochMills)),
+                        timeZoneOfWindow));
+        assertEquals(
+                end, localTimestampStr(assignSliceEnd(assigner, epochMills), timeZoneOfWindow));
+    }
+
+    public static String localTimestampStr(long epochMills, TimeZone timeZone) {
+        return LocalDateTime.ofInstant(Instant.ofEpochMilli(epochMills), timeZone.toZoneId())
+                .toString();
+    }
+
     /** Get epoch mills from a timestamp string and the time zone the timestamp belonged to. */
-    protected static long epochMills(TimeZone timeZone, String timestampStr) {
+    public static long epochMills(TimeZone timeZone, String timestampStr) {
         LocalDateTime localDateTime = LocalDateTime.parse(timestampStr);
-        ZoneOffset zoneOffset = timeZone.toZoneId().getRules().getOffset(localDateTime);
-        return localDateTime.toInstant(zoneOffset).toEpochMilli();
+        return localDateTime.atZone(timeZone.toZoneId()).toInstant().toEpochMilli();
     }
 }

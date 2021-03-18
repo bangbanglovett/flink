@@ -42,6 +42,7 @@ import org.apache.flink.table.runtime.operators.window.triggers.Trigger;
 import org.apache.flink.table.types.logical.LogicalType;
 
 import java.time.Duration;
+import java.util.TimeZone;
 
 import static org.apache.flink.util.Preconditions.checkArgument;
 import static org.apache.flink.util.Preconditions.checkNotNull;
@@ -82,27 +83,27 @@ public class WindowOperatorBuilder {
         return this;
     }
 
-    public WindowOperatorBuilder tumble(Duration size) {
+    public WindowOperatorBuilder tumble(Duration size, TimeZone timeZone) {
         checkArgument(windowAssigner == null);
-        this.windowAssigner = TumblingWindowAssigner.of(size);
+        this.windowAssigner = TumblingWindowAssigner.of(size, timeZone);
         return this;
     }
 
-    public WindowOperatorBuilder sliding(Duration size, Duration slide) {
+    public WindowOperatorBuilder sliding(Duration size, Duration slide, TimeZone timeZone) {
         checkArgument(windowAssigner == null);
-        this.windowAssigner = SlidingWindowAssigner.of(size, slide);
+        this.windowAssigner = SlidingWindowAssigner.of(size, slide, timeZone);
         return this;
     }
 
-    public WindowOperatorBuilder cumulative(Duration size, Duration step) {
+    public WindowOperatorBuilder cumulative(Duration size, Duration step, TimeZone timeZone) {
         checkArgument(windowAssigner == null);
-        this.windowAssigner = CumulativeWindowAssigner.of(size, step);
+        this.windowAssigner = CumulativeWindowAssigner.of(size, step, timeZone);
         return this;
     }
 
-    public WindowOperatorBuilder session(Duration sessionGap) {
+    public WindowOperatorBuilder session(Duration sessionGap, TimeZone timeZone) {
         checkArgument(windowAssigner == null);
-        this.windowAssigner = SessionWindowAssigner.withGap(sessionGap);
+        this.windowAssigner = SessionWindowAssigner.withGap(sessionGap, timeZone);
         return this;
     }
 

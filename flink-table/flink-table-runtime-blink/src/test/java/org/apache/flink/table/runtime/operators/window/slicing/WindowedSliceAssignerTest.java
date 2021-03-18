@@ -40,7 +40,8 @@ public class WindowedSliceAssignerTest extends SliceAssignerTestBase {
 
     @Parameterized.Parameters(name = "timezone = {0}")
     public static Collection<TimeZone> parameters() {
-        return Arrays.asList(TimeZone.getTimeZone("UTC"), TimeZone.getTimeZone("Asia/Shanghai"));
+        return Arrays.asList(
+                TimeZone.getTimeZone("America/Los_Angeles"), TimeZone.getTimeZone("Asia/Shanghai"));
     }
 
     private SliceAssigner TUMBLE_ASSIGNER;
@@ -49,14 +50,11 @@ public class WindowedSliceAssignerTest extends SliceAssignerTestBase {
 
     @Before
     public void setUp() {
-        this.TUMBLE_ASSIGNER =
-                SliceAssigners.tumbling(-1, timeZone.getRawOffset(), Duration.ofHours(5));
+        this.TUMBLE_ASSIGNER = SliceAssigners.tumbling(-1, timeZone, Duration.ofHours(4));
         this.HOP_ASSIGNER =
-                SliceAssigners.hopping(
-                        0, timeZone.getRawOffset(), Duration.ofHours(5), Duration.ofHours(1));
+                SliceAssigners.hopping(0, timeZone, Duration.ofHours(5), Duration.ofHours(1));
         this.CUMULATE_ASSIGNER =
-                SliceAssigners.cumulative(
-                        0, timeZone.getRawOffset(), Duration.ofHours(5), Duration.ofHours(1));
+                SliceAssigners.cumulative(0, timeZone, Duration.ofHours(5), Duration.ofHours(1));
     }
 
     @Test
@@ -79,14 +77,14 @@ public class WindowedSliceAssignerTest extends SliceAssignerTestBase {
         SliceAssigner assigner = SliceAssigners.windowed(0, TUMBLE_ASSIGNER);
 
         assertEquals(
-                epochMills("1969-12-31T19:00:00"),
+                epochMills("1969-12-31T20:00:00"),
                 assigner.getWindowStart(epochMills("1970-01-01T00:00:00")));
         assertEquals(
                 epochMills("1970-01-01T00:00:00"),
-                assigner.getWindowStart(epochMills("1970-01-01T05:00:00")));
+                assigner.getWindowStart(epochMills("1970-01-01T04:00:00")));
         assertEquals(
-                epochMills("1970-01-01T05:00:00"),
-                assigner.getWindowStart(epochMills("1970-01-01T10:00:00")));
+                epochMills("1970-01-01T04:00:00"),
+                assigner.getWindowStart(epochMills("1970-01-01T08:00:00")));
     }
 
     @Test
@@ -157,8 +155,8 @@ public class WindowedSliceAssignerTest extends SliceAssignerTestBase {
                 Collections.singletonList(epochMills("1970-01-01T00:00:00")),
                 expiredSlices(assigner, epochMills("1970-01-01T00:00:00")));
         assertEquals(
-                Collections.singletonList(epochMills("1970-01-01T05:00:00")),
-                expiredSlices(assigner, epochMills("1970-01-01T05:00:00")));
+                Collections.singletonList(epochMills("1970-01-01T04:00:00")),
+                expiredSlices(assigner, epochMills("1970-01-01T04:00:00")));
         assertEquals(
                 Collections.singletonList(epochMills("1970-01-01T10:00:00")),
                 expiredSlices(assigner, epochMills("1970-01-01T10:00:00")));

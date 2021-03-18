@@ -98,7 +98,11 @@ public class SlicingWindowAggOperatorTest {
     @Test
     public void testEventTimeHoppingWindows() throws Exception {
         final SliceAssigner assigner =
-                SliceAssigners.hopping(2, 0, Duration.ofSeconds(3), Duration.ofSeconds(1));
+                SliceAssigners.hopping(
+                        2,
+                        TimeZone.getTimeZone("UTC"),
+                        Duration.ofSeconds(3),
+                        Duration.ofSeconds(1));
         final SumAndCountAggsFunction aggsFunction = new SumAndCountAggsFunction(assigner);
         SlicingWindowOperator<RowData, ?> operator =
                 SlicingWindowAggOperatorBuilder.builder()
@@ -214,8 +218,7 @@ public class SlicingWindowAggOperatorTest {
 
     private void testProcessingTimeHoppingWindows(TimeZone timeZone) throws Exception {
         final SliceAssigner assigner =
-                SliceAssigners.hopping(
-                        -1, timeZone.getRawOffset(), Duration.ofHours(3), Duration.ofHours(1));
+                SliceAssigners.hopping(-1, timeZone, Duration.ofHours(3), Duration.ofHours(1));
         final SumAndCountAggsFunction aggsFunction = new SumAndCountAggsFunction(assigner);
         SlicingWindowOperator<RowData, ?> operator =
                 SlicingWindowAggOperatorBuilder.builder()
@@ -335,7 +338,11 @@ public class SlicingWindowAggOperatorTest {
     @Test
     public void testEventTimeCumulativeWindows() throws Exception {
         final SliceAssigner assigner =
-                SliceAssigners.cumulative(2, 0, Duration.ofSeconds(3), Duration.ofSeconds(1));
+                SliceAssigners.cumulative(
+                        2,
+                        TimeZone.getTimeZone("UTC"),
+                        Duration.ofSeconds(3),
+                        Duration.ofSeconds(1));
         final SumAndCountAggsFunction aggsFunction = new SumAndCountAggsFunction(assigner);
         SlicingWindowOperator<RowData, ?> operator =
                 SlicingWindowAggOperatorBuilder.builder()
@@ -450,8 +457,7 @@ public class SlicingWindowAggOperatorTest {
 
     private void testProcessingTimeCumulativeWindows(TimeZone timeZone) throws Exception {
         final SliceAssigner assigner =
-                SliceAssigners.cumulative(
-                        -1, timeZone.getRawOffset(), Duration.ofDays(1), Duration.ofHours(8));
+                SliceAssigners.cumulative(-1, timeZone, Duration.ofDays(1), Duration.ofHours(8));
         final SumAndCountAggsFunction aggsFunction = new SumAndCountAggsFunction(assigner);
         SlicingWindowOperator<RowData, ?> operator =
                 SlicingWindowAggOperatorBuilder.builder()
@@ -583,7 +589,8 @@ public class SlicingWindowAggOperatorTest {
 
     @Test
     public void testEventTimeTumblingWindows() throws Exception {
-        final SliceAssigner assigner = SliceAssigners.tumbling(2, 0, Duration.ofSeconds(3));
+        final SliceAssigner assigner =
+                SliceAssigners.tumbling(2, TimeZone.getTimeZone("UTC"), Duration.ofSeconds(3));
         final SumAndCountAggsFunction aggsFunction = new SumAndCountAggsFunction(assigner);
         SlicingWindowOperator<RowData, ?> operator =
                 SlicingWindowAggOperatorBuilder.builder()
@@ -693,8 +700,7 @@ public class SlicingWindowAggOperatorTest {
 
     private void testProcessingTimeTumblingWindows(TimeZone timeZone) throws Exception {
 
-        final SliceAssigner assigner =
-                SliceAssigners.tumbling(-1, timeZone.getRawOffset(), Duration.ofHours(5));
+        final SliceAssigner assigner = SliceAssigners.tumbling(-1, timeZone, Duration.ofHours(5));
         // the assigned windows should like as following, e.g. the given timeZone is UTC+8:
         //  local windows(timestamp in UTC+8)   <=>  epoch windows(timestamp in UTC+0)
         // [1970-01-01 00:00, 1970-01-01 05:00] <=> [1969-12-31 16:00, 1969-12-31 21:00]
@@ -771,7 +777,11 @@ public class SlicingWindowAggOperatorTest {
     @Test
     public void testInvalidWindows() {
         final SliceAssigner assigner =
-                SliceAssigners.hopping(2, 0, Duration.ofSeconds(3), Duration.ofSeconds(1));
+                SliceAssigners.hopping(
+                        2,
+                        TimeZone.getTimeZone("UTC"),
+                        Duration.ofSeconds(3),
+                        Duration.ofSeconds(1));
         final SumAndCountAggsFunction aggsFunction = new SumAndCountAggsFunction(assigner);
 
         try {

@@ -28,6 +28,9 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.NavigableSet;
+import java.util.TimeZone;
+
+import static org.apache.flink.table.runtime.util.TimeWindowUtil.windowPlus;
 
 /**
  * A {@link WindowAssigner} that windows elements into sessions based on the timestamp. Windows
@@ -40,20 +43,24 @@ public class SessionWindowAssigner extends MergingWindowAssigner<TimeWindow>
 
     private final long sessionGap;
 
+    protected final TimeZone timeZone;
+
     private final boolean isEventTime;
 
-    protected SessionWindowAssigner(long sessionGap, boolean isEventTime) {
+    protected SessionWindowAssigner(long sessionGap, TimeZone timeZone, boolean isEventTime) {
         if (sessionGap <= 0) {
             throw new IllegalArgumentException(
                     "SessionWindowAssigner parameters must satisfy 0 < size");
         }
         this.sessionGap = sessionGap;
+        this.timeZone = timeZone;
         this.isEventTime = isEventTime;
     }
 
     @Override
     public Collection<TimeWindow> assignWindows(RowData element, long timestamp) {
-        return Collections.singletonList(new TimeWindow(timestamp, timestamp + sessionGap));
+        return Collections.singletonList(
+                new TimeWindow(timestamp, windowPlus(timestamp, sessionGap, timeZone)));
     }
 
     @Override
@@ -119,15 +126,15 @@ public class SessionWindowAssigner extends MergingWindowAssigner<TimeWindow>
      * @param size The session timeout, i.e. the time gap between sessions
      * @return The policy.
      */
-    public static SessionWindowAssigner withGap(Duration size) {
-        return new SessionWindowAssigner(size.toMillis(), true);
+    public static SessionWindowAssigner withGap(Duration size, TimeZone timeZone) {
+        return new SessionWindowAssigner(size.toMillis(), timeZone, true);
     }
 
     public SessionWindowAssigner withEventTime() {
-        return new SessionWindowAssigner(sessionGap, true);
+        return new SessionWindowAssigner(sessionGap, timeZone, true);
     }
 
     public SessionWindowAssigner withProcessingTime() {
-        return new SessionWindowAssigner(sessionGap, false);
+        return new SessionWindowAssigner(sessionGap, timeZone, false);
     }
 }

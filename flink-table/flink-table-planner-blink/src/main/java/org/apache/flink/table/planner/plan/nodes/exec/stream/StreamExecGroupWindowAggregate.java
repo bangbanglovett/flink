@@ -58,6 +58,7 @@ import org.apache.flink.table.runtime.types.LogicalTypeDataTypeConverter;
 import org.apache.flink.table.runtime.typeutils.InternalTypeInfo;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.LogicalType;
+import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.table.types.logical.RowType;
 
 import org.apache.calcite.rel.core.AggregateCall;
@@ -70,6 +71,7 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.TimeZone;
 
 import static org.apache.flink.table.planner.plan.utils.AggregateUtil.hasRowIntervalType;
 import static org.apache.flink.table.planner.plan.utils.AggregateUtil.hasTimeIntervalType;
@@ -190,6 +192,15 @@ public class StreamExecGroupWindowAggregate extends ExecNodeBase<RowData>
 
         final LogicalType[] aggValueTypes = extractLogicalTypes(aggInfoList.getActualValueTypes());
         final LogicalType[] accTypes = extractLogicalTypes(aggInfoList.getAccTypes());
+
+        // assign window based on the local time zone if time attribute type is TIMESTAMP_LTZ
+        final boolean needLocalTimeZone =
+                window.timeAttribute().getOutputDataType().getLogicalType().getTypeRoot()
+                        == LogicalTypeRoot.TIMESTAMP_WITH_LOCAL_TIME_ZONE;
+        final TimeZone timeZoneOfWindow =
+                needLocalTimeZone
+                        ? TimeZone.getTimeZone(config.getLocalTimeZone())
+                        : TimeZone.getTimeZone("UTC");
         final WindowOperator<?, ?> operator =
                 createWindowOperator(
                         aggCodeGenerator,
@@ -198,7 +209,8 @@ public class StreamExecGroupWindowAggregate extends ExecNodeBase<RowData>
                         windowPropertyTypes,
                         aggValueTypes,
                         inputRowType.getChildren().toArray(new LogicalType[0]),
-                        inputTimeFieldIndex);
+                        inputTimeFieldIndex,
+                        timeZoneOfWindow);
 
         final OneInputTransformation<RowData, RowData> transform =
                 new OneInputTransformation<>(
@@ -288,7 +300,8 @@ public class StreamExecGroupWindowAggregate extends ExecNodeBase<RowData>
             LogicalType[] windowPropertyTypes,
             LogicalType[] aggValueTypes,
             LogicalType[] inputFields,
-            int timeFieldIndex) {
+            int timeFieldIndex,
+            TimeZone timeZone) {
         WindowOperatorBuilder builder =
                 WindowOperatorBuilder.builder().withInputFields(inputFields);
 
@@ -297,9 +310,9 @@ public class StreamExecGroupWindowAggregate extends ExecNodeBase<RowData>
             FieldReferenceExpression timeField = tumblingWindow.timeField();
             ValueLiteralExpression size = tumblingWindow.size();
             if (isProctimeAttribute(timeField) && hasTimeIntervalType(size)) {
-                builder = builder.tumble(toDuration(size)).withProcessingTime();
+                builder = builder.tumble(toDuration(size), timeZone).withProcessingTime();
             } else if (isRowtimeAttribute(timeField) && hasTimeIntervalType(size)) {
-                builder = builder.tumble(toDuration(size)).withEventTime(timeFieldIndex);
+                builder = builder.tumble(toDuration(size), timeZone).withEventTime(timeFieldIndex);
             } else if (isProctimeAttribute(timeField) && hasRowIntervalType(size)) {
                 builder = builder.countWindow(toLong(size));
             } else {
@@ -315,10 +328,12 @@ public class StreamExecGroupWindowAggregate extends ExecNodeBase<RowData>
             ValueLiteralExpression size = slidingWindow.size();
             ValueLiteralExpression slide = slidingWindow.slide();
             if (isProctimeAttribute(timeField) && hasTimeIntervalType(size)) {
-                builder = builder.sliding(toDuration(size), toDuration(slide)).withProcessingTime();
+                builder =
+                        builder.sliding(toDuration(size), toDuration(slide), timeZone)
+                                .withProcessingTime();
             } else if (isRowtimeAttribute(timeField) && hasTimeIntervalType(size)) {
                 builder =
-                        builder.sliding(toDuration(size), toDuration(slide))
+                        builder.sliding(toDuration(size), toDuration(slide), timeZone)
                                 .withEventTime(timeFieldIndex);
             } else if (isProctimeAttribute(timeField) && hasRowIntervalType(size)) {
                 builder = builder.countWindow(toLong(size), toLong(slide));
@@ -334,9 +349,9 @@ public class StreamExecGroupWindowAggregate extends ExecNodeBase<RowData>
             FieldReferenceExpression timeField = sessionWindow.timeField();
             ValueLiteralExpression gap = sessionWindow.gap();
             if (isProctimeAttribute(timeField)) {
-                builder = builder.session(toDuration(gap)).withProcessingTime();
+                builder = builder.session(toDuration(gap), timeZone).withProcessingTime();
             } else if (isRowtimeAttribute(timeField)) {
-                builder = builder.session(toDuration(gap)).withEventTime(timeFieldIndex);
+                builder = builder.session(toDuration(gap), timeZone).withEventTime(timeFieldIndex);
             } else {
                 throw new UnsupportedOperationException("This should not happen.");
             }

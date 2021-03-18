@@ -32,6 +32,11 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
+import java.util.TimeZone;
+
+import static org.apache.flink.table.runtime.util.TimeWindowUtil.getWindowStartWithOffset;
+import static org.apache.flink.table.runtime.util.TimeWindowUtil.windowMinus;
+import static org.apache.flink.table.runtime.util.TimeWindowUtil.windowPlus;
 
 /**
  * A {@link WindowAssigner} that windows elements into sliding windows based on the timestamp of the
@@ -46,6 +51,9 @@ public class SlidingWindowAssigner extends PanedWindowAssigner<TimeWindow>
 
     private final long slide;
 
+    /** The TimeZone used to shift the window start and end with UTC+0 timeZone. */
+    private final TimeZone timeZone;
+
     private final long offset;
 
     private final long paneSize;
@@ -54,7 +62,8 @@ public class SlidingWindowAssigner extends PanedWindowAssigner<TimeWindow>
 
     private final boolean isEventTime;
 
-    protected SlidingWindowAssigner(long size, long slide, long offset, boolean isEventTime) {
+    protected SlidingWindowAssigner(
+            long size, long slide, TimeZone timeZone, long offset, boolean isEventTime) {
         if (size <= 0 || slide <= 0) {
             throw new IllegalArgumentException(
                     "SlidingWindowAssigner parameters must satisfy slide > 0 and size > 0");
@@ -62,6 +71,7 @@ public class SlidingWindowAssigner extends PanedWindowAssigner<TimeWindow>
 
         this.size = size;
         this.slide = slide;
+        this.timeZone = timeZone;
         this.offset = offset;
         this.isEventTime = isEventTime;
         this.paneSize = ArithmeticUtils.gcd(size, slide);
@@ -71,28 +81,30 @@ public class SlidingWindowAssigner extends PanedWindowAssigner<TimeWindow>
     @Override
     public Collection<TimeWindow> assignWindows(RowData element, long timestamp) {
         List<TimeWindow> windows = new ArrayList<>((int) (size / slide));
-        long lastStart = TimeWindow.getWindowStartWithOffset(timestamp, offset, slide);
-        for (long start = lastStart; start > timestamp - size; start -= slide) {
-            windows.add(new TimeWindow(start, start + size));
+        long lastStart = getWindowStartWithOffset(timestamp, offset, slide, timeZone);
+        for (long start = lastStart;
+                start > windowMinus(timestamp, size, timeZone);
+                start = windowMinus(start, slide, timeZone)) {
+            windows.add(new TimeWindow(start, windowPlus(start, size, timeZone)));
         }
         return windows;
     }
 
     @Override
     public TimeWindow assignPane(Object element, long timestamp) {
-        long start = TimeWindow.getWindowStartWithOffset(timestamp, offset, paneSize);
-        return new TimeWindow(start, start + paneSize);
+        long start = getWindowStartWithOffset(timestamp, offset, paneSize, timeZone);
+        return new TimeWindow(start, windowPlus(start, paneSize, timeZone));
     }
 
     @Override
     public Iterable<TimeWindow> splitIntoPanes(TimeWindow window) {
-        return new PanesIterable(window.getStart(), paneSize, numPanesPerWindow);
+        return new PanesIterable(window.getStart(), paneSize, numPanesPerWindow, timeZone);
     }
 
     @Override
     public TimeWindow getLastWindow(TimeWindow pane) {
-        long lastStart = TimeWindow.getWindowStartWithOffset(pane.getStart(), offset, slide);
-        return new TimeWindow(lastStart, lastStart + size);
+        long lastStart = getWindowStartWithOffset(pane.getStart(), offset, slide, timeZone);
+        return new TimeWindow(lastStart, windowPlus(lastStart, size, timeZone));
     }
 
     @Override
@@ -115,11 +127,13 @@ public class SlidingWindowAssigner extends PanedWindowAssigner<TimeWindow>
         private final long paneSize;
         private long paneStart;
         private int numPanesRemaining;
+        private TimeZone timeZone;
 
-        PanesIterable(long paneStart, long paneSize, int numPanesPerWindow) {
+        PanesIterable(long paneStart, long paneSize, int numPanesPerWindow, TimeZone timeZone) {
             this.paneStart = paneStart;
             this.paneSize = paneSize;
             this.numPanesRemaining = numPanesPerWindow;
+            this.timeZone = timeZone;
         }
 
         @Override
@@ -129,9 +143,10 @@ public class SlidingWindowAssigner extends PanedWindowAssigner<TimeWindow>
 
         @Override
         public TimeWindow next() {
-            TimeWindow window = new TimeWindow(paneStart, paneStart + paneSize);
+            TimeWindow window =
+                    new TimeWindow(paneStart, windowPlus(paneStart, paneSize, timeZone));
             numPanesRemaining--;
-            paneStart += paneSize;
+            paneStart = windowPlus(paneStart, paneSize, timeZone);
             return window;
         }
 
@@ -152,21 +167,24 @@ public class SlidingWindowAssigner extends PanedWindowAssigner<TimeWindow>
      *
      * @param size The size of the generated windows.
      * @param slide The slide interval of the generated windows.
+     * @param timeZoneOfWindow The timeZone used to shift the window start and end.
      * @return The time policy.
      */
-    public static SlidingWindowAssigner of(Duration size, Duration slide) {
-        return new SlidingWindowAssigner(size.toMillis(), slide.toMillis(), 0, true);
+    public static SlidingWindowAssigner of(
+            Duration size, Duration slide, TimeZone timeZoneOfWindow) {
+        return new SlidingWindowAssigner(
+                size.toMillis(), slide.toMillis(), timeZoneOfWindow, 0, true);
     }
 
     public SlidingWindowAssigner withOffset(Duration offset) {
-        return new SlidingWindowAssigner(size, slide, offset.toMillis(), isEventTime);
+        return new SlidingWindowAssigner(size, slide, timeZone, offset.toMillis(), isEventTime);
     }
 
     public SlidingWindowAssigner withEventTime() {
-        return new SlidingWindowAssigner(size, slide, offset, true);
+        return new SlidingWindowAssigner(size, slide, timeZone, offset, true);
     }
 
     public SlidingWindowAssigner withProcessingTime() {
-        return new SlidingWindowAssigner(size, slide, offset, false);
+        return new SlidingWindowAssigner(size, slide, timeZone, offset, false);
     }
 }

@@ -163,8 +163,8 @@ public class SqlWindowTableFunction extends SqlFunction implements SqlTableFunct
                 .builder()
                 .kind(inputRowType.getStructKind())
                 .addAll(inputRowType.getFieldList())
-                .add("window_start", SqlTypeName.TIMESTAMP, 3)
-                .add("window_end", SqlTypeName.TIMESTAMP, 3)
+                .add("window_start", timeAttributeType.getSqlTypeName(), 3)
+                .add("window_end", timeAttributeType.getSqlTypeName(), 3)
                 .add("window_time", typeFactory.createTypeWithNullability(timeAttributeType, false))
                 .build();
     }

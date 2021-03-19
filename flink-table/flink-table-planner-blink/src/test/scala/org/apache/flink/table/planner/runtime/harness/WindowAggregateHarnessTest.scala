@@ -98,8 +98,8 @@ class WindowAggregateHarnessTest(backend: StateBackendMode)
         DataTypes.BIGINT().getLogicalType,
         DataTypes.DOUBLE().getLogicalType,
         DataTypes.BIGINT().getLogicalType,
-        DataTypes.TIMESTAMP(3).getLogicalType,
-        DataTypes.TIMESTAMP(3).getLogicalType))
+        DataTypes.TIMESTAMP_LTZ(3).getLogicalType,
+        DataTypes.TIMESTAMP_LTZ(3).getLogicalType))
 
     testHarness.open()
     ingestData(testHarness)
@@ -145,8 +145,8 @@ class WindowAggregateHarnessTest(backend: StateBackendMode)
         DataTypes.BIGINT().getLogicalType,
         DataTypes.DOUBLE().getLogicalType,
         DataTypes.BIGINT().getLogicalType,
-        DataTypes.TIMESTAMP(3).getLogicalType,
-        DataTypes.TIMESTAMP(3).getLogicalType))
+        DataTypes.TIMESTAMP_LTZ(3).getLogicalType,
+        DataTypes.TIMESTAMP_LTZ(3).getLogicalType))
 
     testHarness.open()
     ingestData(testHarness)
@@ -201,8 +201,8 @@ class WindowAggregateHarnessTest(backend: StateBackendMode)
         DataTypes.BIGINT().getLogicalType,
         DataTypes.DOUBLE().getLogicalType,
         DataTypes.BIGINT().getLogicalType,
-        DataTypes.TIMESTAMP(3).getLogicalType,
-        DataTypes.TIMESTAMP(3).getLogicalType))
+        DataTypes.TIMESTAMP_LTZ(3).getLogicalType,
+        DataTypes.TIMESTAMP_LTZ(3).getLogicalType))
 
     testHarness.open()
     ingestData(testHarness)

@@ -44,6 +44,7 @@ import org.apache.flink.table.runtime.typeutils.PagedTypeSerializer;
 import org.apache.flink.table.runtime.typeutils.RowDataSerializer;
 import org.apache.flink.table.runtime.util.TimeWindowUtil;
 import org.apache.flink.table.types.logical.LogicalType;
+import org.apache.flink.table.runtime.util.TimeWindowUtil;
 import org.apache.flink.table.types.logical.RowType;
 
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonCreator;
@@ -144,7 +145,8 @@ public class StreamExecLocalWindowAggregate extends StreamExecWindowAggregateBas
                         sliceAssigner,
                         (PagedTypeSerializer<RowData>) selector.getProducedType().toSerializer(),
                         new RowDataSerializer(inputRowType),
-                        generatedAggsHandler);
+                        generatedAggsHandler,
+                        shiftTimeZone);
 
         return ExecNodeUtil.createOneInputTransformation(
                 inputTransform,

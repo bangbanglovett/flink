@@ -26,8 +26,13 @@ import org.apache.flink.table.runtime.operators.window.TimeWindow;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
 import java.time.Duration;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.TimeZone;
 
 import static org.apache.flink.table.runtime.operators.window.WindowTestUtils.timeWindow;
 import static org.hamcrest.Matchers.contains;
@@ -38,7 +43,18 @@ import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 
 /** Tests for {@link SlidingWindowAssigner}. */
+@RunWith(Parameterized.class)
 public class SlidingWindowAssignerTest {
+
+    public static final long HOUR = 3600000L; // = 60 * 60 * 1000
+
+    @Parameterized.Parameter public TimeZone timeZone;
+
+    @Parameterized.Parameters(name = "timezone = {0}")
+    public static Collection<TimeZone> parameters() {
+        return Arrays.asList(
+                TimeZone.getTimeZone("America/Los_Angeles"), TimeZone.getTimeZone("Asia/Shanghai"));
+    }
 
     private static final RowData ELEMENT = GenericRowData.of("String");
 
@@ -48,7 +64,8 @@ public class SlidingWindowAssignerTest {
     @Test
     public void testWindowAssignment() {
         SlidingWindowAssigner assigner =
-                SlidingWindowAssigner.of(Duration.ofMillis(5000), Duration.ofMillis(1000));
+                SlidingWindowAssigner.of(
+                        Duration.ofMillis(5000), Duration.ofMillis(1000), timeZone);
 
         assertThat(
                 assigner.assignWindows(ELEMENT, 0L),
@@ -108,7 +125,7 @@ public class SlidingWindowAssignerTest {
     @Test
     public void testWindowAssignmentWithOffset() {
         SlidingWindowAssigner assigner =
-                SlidingWindowAssigner.of(Duration.ofMillis(5000), Duration.ofMillis(1000))
+                SlidingWindowAssigner.of(Duration.ofMillis(5000), Duration.ofMillis(1000), timeZone)
                         .withOffset(Duration.ofMillis(100));
 
         assertThat(
@@ -166,25 +183,75 @@ public class SlidingWindowAssignerTest {
     }
 
     @Test
+    public void testDstSaving() {
+        if (!timeZone.useDaylightTime()) {
+            return;
+        }
+        SlidingWindowAssigner assigner =
+                SlidingWindowAssigner.of(Duration.ofHours(4), Duration.ofHours(1), timeZone);
+        // Los_Angeles local time in epoch mills.
+        // The DaylightTime in Los_Angele start at time 2021-03-14 02:00:00
+        // long epoch1 = 1615708800000L; 2021-03-14 00:00:00
+        // long epoch2 = 1615712400000L; 2021-03-14 01:00:00
+        // long epoch3 = 1615716000000L; 2021-03-14 03:00:00, skip one hour (2021-03-14 02:00:00)
+        // long epoch4 = 1615719600000L; 2021-03-14 04:00:00
+
+        long epoch1 = 1615708800000L;
+        assertThat(
+                assigner.assignWindows(ELEMENT, epoch1),
+                containsInAnyOrder(
+                        // 2021-03-13T21:00, 2021-03-14T01:00
+                        // 2021-03-13T22:00, 2021-03-14T03:00
+                        // 2021-03-13T23:00, 2021-03-14T03:00
+                        // 2021-03-14T00:00, 2021-03-14T04:00
+                        timeWindow(1615698000000L, 1615712400000L),
+                        timeWindow(1615701600000L, 1615716000000L),
+                        timeWindow(1615705200000L, 1615716000000L),
+                        timeWindow(1615708800000L, 1615719600000L)));
+
+        // Los_Angeles local time in epoch mills.
+        // The DaylightTime in Los_Angele end at time 2021-11-07 02:00:00
+        // long epoch5 = 1636268400000L;  2021-11-07 00:00:00
+        // long epoch6 = 1636272000000L; the first local timestamp 2021-11-07 01:00:00
+        // long epoch7 = 1636275600000L; rollback to  2021-11-07 01:00:00
+        // long epoch8 = 1636279200000L; 2021-11-07 02:00:00
+        // long epoch9 = 1636282800000L; 2021-11-07 03:00:00
+
+        long epoch8 = 1636279200000L;
+        assertThat(
+                assigner.assignWindows(ELEMENT, epoch8),
+                containsInAnyOrder(
+                        // 2021-11-06T23:00, 2021-11-07T03:00
+                        // 2021-11-07T00:00, 2021-11-07T04:00
+                        // 2021-11-07T01:00, 2021-11-07T05:00
+                        // 2021-11-07T02:00, 2021-11-07T06:00
+                        timeWindow(1636264800000L, 1636282800000L),
+                        timeWindow(1636268400000L, 1636286400000L),
+                        timeWindow(1636272000000L, 1636290000000L),
+                        timeWindow(1636279200000L, 1636293600000L)));
+    }
+
+    @Test
     public void testInvalidParameters() {
         thrown.expect(IllegalArgumentException.class);
         thrown.expectMessage("slide > 0 and size > 0");
-        SlidingWindowAssigner.of(Duration.ofSeconds(-2), Duration.ofSeconds(1));
+        SlidingWindowAssigner.of(Duration.ofSeconds(-2), Duration.ofSeconds(1), timeZone);
 
         thrown.expect(IllegalArgumentException.class);
         thrown.expectMessage("slide > 0 and size > 0");
-        SlidingWindowAssigner.of(Duration.ofSeconds(2), Duration.ofSeconds(-1));
+        SlidingWindowAssigner.of(Duration.ofSeconds(2), Duration.ofSeconds(-1), timeZone);
 
         thrown.expect(IllegalArgumentException.class);
         thrown.expectMessage("slide > 0 and size > 0");
-        SlidingWindowAssigner.of(Duration.ofSeconds(20), Duration.ofSeconds(10))
+        SlidingWindowAssigner.of(Duration.ofSeconds(20), Duration.ofSeconds(10), timeZone)
                 .withOffset(Duration.ofSeconds(-1));
     }
 
     @Test
     public void testProperties() {
         SlidingWindowAssigner assigner =
-                SlidingWindowAssigner.of(Duration.ofMillis(5000), Duration.ofMillis(1000));
+                SlidingWindowAssigner.of(
+                        Duration.ofMillis(5000), Duration.ofMillis(1000), timeZone);
 
         assertTrue(assigner.isEventTime());
         assertEquals(

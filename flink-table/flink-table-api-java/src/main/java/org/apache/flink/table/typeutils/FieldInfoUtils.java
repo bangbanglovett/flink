@@ -40,6 +40,7 @@ import org.apache.flink.table.functions.BuiltInFunctionDefinitions;
 import org.apache.flink.table.types.AtomicDataType;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.DataTypeQueryable;
+import org.apache.flink.table.types.logical.LocalZonedTimestampType;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.table.types.logical.TimestampKind;
@@ -820,8 +821,13 @@ public class FieldInfoUtils {
     }
 
     private static DataType createTimeIndicatorType(TimestampKind kind) {
-        return new AtomicDataType(new TimestampType(true, kind, 3))
-                .bridgedTo(java.sql.Timestamp.class);
+        if (kind == TimestampKind.PROCTIME) {
+            return new AtomicDataType(new LocalZonedTimestampType(true, kind, 3))
+                    .bridgedTo(java.time.Instant.class);
+        } else {
+            return new AtomicDataType(new TimestampType(true, kind, 3))
+                    .bridgedTo(java.sql.Timestamp.class);
+        }
     }
 
     private FieldInfoUtils() {}

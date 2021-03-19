@@ -235,7 +235,8 @@ class DefaultSchemaResolver implements SchemaResolver {
                             columns.stream().map(Column::getName).collect(Collectors.toList())));
         }
         final LogicalType timeFieldType = timeColumn.get().getDataType().getLogicalType();
-        if (!hasRoot(timeFieldType, LogicalTypeRoot.TIMESTAMP_WITHOUT_TIME_ZONE)
+        if (!(hasRoot(timeFieldType, LogicalTypeRoot.TIMESTAMP_WITHOUT_TIME_ZONE)
+                        || hasRoot(timeFieldType, LogicalTypeRoot.TIMESTAMP_WITH_LOCAL_TIME_ZONE))
                 || getPrecision(timeFieldType) != 3) {
             throw new ValidationException(
                     "Invalid data type of time field for watermark definition. "

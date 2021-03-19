@@ -47,7 +47,10 @@ import org.apache.flink.table.utils.HandwrittenSelectorUtil;
 import org.junit.Test;
 
 import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Arrays;
+import java.util.TimeZone;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -99,7 +102,11 @@ public class SlicingWindowAggOperatorTest {
     @Test
     public void testEventTimeHoppingWindows() throws Exception {
         final SliceAssigner assigner =
-                SliceAssigners.hopping(2, Duration.ofSeconds(3), Duration.ofSeconds(1));
+                SliceAssigners.hopping(
+                        2,
+                        TimeZone.getTimeZone("UTC"),
+                        Duration.ofSeconds(3),
+                        Duration.ofSeconds(1));
         final SumAndCountAggsFunction aggsFunction = new SumAndCountAggsFunction(assigner);
         SlicingWindowOperator<RowData, ?> operator =
                 SlicingWindowAggOperatorBuilder.builder()
@@ -204,9 +211,18 @@ public class SlicingWindowAggOperatorTest {
     }
 
     @Test
-    public void testProcessingTimeHoppingWindows() throws Exception {
+    public void testProcessingTimeHoppingWindowsInUTC() throws Exception {
+        testProcessingTimeHoppingWindows(TimeZone.getTimeZone("UTC"));
+    }
+
+    @Test
+    public void testProcessingTimeHoppingWindowsInShanghai() throws Exception {
+        testProcessingTimeHoppingWindows(TimeZone.getTimeZone("Asia/Shanghai"));
+    }
+
+    private void testProcessingTimeHoppingWindows(TimeZone timeZone) throws Exception {
         final SliceAssigner assigner =
-                SliceAssigners.hopping(-1, Duration.ofSeconds(3), Duration.ofSeconds(1));
+                SliceAssigners.hopping(-1, timeZone, Duration.ofHours(3), Duration.ofHours(1));
         final SumAndCountAggsFunction aggsFunction = new SumAndCountAggsFunction(assigner);
         SlicingWindowOperator<RowData, ?> operator =
                 SlicingWindowAggOperatorBuilder.builder()
@@ -227,12 +243,18 @@ public class SlicingWindowAggOperatorTest {
         ConcurrentLinkedQueue<Object> expectedOutput = new ConcurrentLinkedQueue<>();
 
         // timestamp is ignored in processing time
-        testHarness.setProcessingTime(3);
+        testHarness.setProcessingTime(epochMills(timeZone, "1970-01-01T00:00:00.003"));
         testHarness.processElement(insertRecord("key2", 1, Long.MAX_VALUE));
 
-        testHarness.setProcessingTime(1000);
+        testHarness.setProcessingTime(epochMills(timeZone, "1970-01-01T01:00:00"));
 
-        expectedOutput.add(insertRecord("key2", 1L, 1L, -2000L, 1000L));
+        expectedOutput.add(
+                insertRecord(
+                        "key2",
+                        1L,
+                        1L,
+                        epochMills(timeZone, "1969-12-31T22:00:00"),
+                        epochMills(timeZone, "1970-01-01T01:00:00")));
 
         ASSERTER.assertOutputEqualsSorted(
                 "Output was not correct.", expectedOutput, testHarness.getOutput());
@@ -240,19 +262,37 @@ public class SlicingWindowAggOperatorTest {
         testHarness.processElement(insertRecord("key2", 1, Long.MAX_VALUE));
         testHarness.processElement(insertRecord("key2", 1, Long.MAX_VALUE));
 
-        testHarness.setProcessingTime(2000);
+        testHarness.setProcessingTime(epochMills(timeZone, "1970-01-01T02:00:00"));
 
-        expectedOutput.add(insertRecord("key2", 3L, 3L, -1000L, 2000L));
+        expectedOutput.add(
+                insertRecord(
+                        "key2",
+                        3L,
+                        3L,
+                        epochMills(timeZone, "1969-12-31T23:00:00"),
+                        epochMills(timeZone, "1970-01-01T02:00:00")));
         ASSERTER.assertOutputEqualsSorted(
                 "Output was not correct.", expectedOutput, testHarness.getOutput());
 
         testHarness.processElement(insertRecord("key1", 1, Long.MAX_VALUE));
         testHarness.processElement(insertRecord("key1", 1, Long.MAX_VALUE));
 
-        testHarness.setProcessingTime(3000);
+        testHarness.setProcessingTime(epochMills(timeZone, "1970-01-01T03:00:00"));
 
-        expectedOutput.add(insertRecord("key2", 3L, 3L, 0L, 3000L));
-        expectedOutput.add(insertRecord("key1", 2L, 2L, 0L, 3000L));
+        expectedOutput.add(
+                insertRecord(
+                        "key2",
+                        3L,
+                        3L,
+                        epochMills(timeZone, "1970-01-01T00:00:00"),
+                        epochMills(timeZone, "1970-01-01T03:00:00")));
+        expectedOutput.add(
+                insertRecord(
+                        "key1",
+                        2L,
+                        2L,
+                        epochMills(timeZone, "1970-01-01T00:00:00"),
+                        epochMills(timeZone, "1970-01-01T03:00:00")));
 
         ASSERTER.assertOutputEqualsSorted(
                 "Output was not correct.", expectedOutput, testHarness.getOutput());
@@ -261,12 +301,36 @@ public class SlicingWindowAggOperatorTest {
         testHarness.processElement(insertRecord("key1", 1, Long.MAX_VALUE));
         testHarness.processElement(insertRecord("key1", 1, Long.MAX_VALUE));
 
-        testHarness.setProcessingTime(7000);
+        testHarness.setProcessingTime(epochMills(timeZone, "1970-01-01T07:00:00"));
 
-        expectedOutput.add(insertRecord("key2", 2L, 2L, 1000L, 4000L));
-        expectedOutput.add(insertRecord("key1", 5L, 5L, 1000L, 4000L));
-        expectedOutput.add(insertRecord("key1", 5L, 5L, 2000L, 5000L));
-        expectedOutput.add(insertRecord("key1", 3L, 3L, 3000L, 6000L));
+        expectedOutput.add(
+                insertRecord(
+                        "key2",
+                        2L,
+                        2L,
+                        epochMills(timeZone, "1970-01-01T01:00:00"),
+                        epochMills(timeZone, "1970-01-01T04:00:00")));
+        expectedOutput.add(
+                insertRecord(
+                        "key1",
+                        5L,
+                        5L,
+                        epochMills(timeZone, "1970-01-01T01:00:00"),
+                        epochMills(timeZone, "1970-01-01T04:00:00")));
+        expectedOutput.add(
+                insertRecord(
+                        "key1",
+                        5L,
+                        5L,
+                        epochMills(timeZone, "1970-01-01T02:00:00"),
+                        epochMills(timeZone, "1970-01-01T05:00:00")));
+        expectedOutput.add(
+                insertRecord(
+                        "key1",
+                        3L,
+                        3L,
+                        epochMills(timeZone, "1970-01-01T03:00:00"),
+                        epochMills(timeZone, "1970-01-01T06:00:00")));
 
         ASSERTER.assertOutputEqualsSorted(
                 "Output was not correct.", expectedOutput, testHarness.getOutput());
@@ -278,7 +342,11 @@ public class SlicingWindowAggOperatorTest {
     @Test
     public void testEventTimeCumulativeWindows() throws Exception {
         final SliceAssigner assigner =
-                SliceAssigners.cumulative(2, Duration.ofSeconds(3), Duration.ofSeconds(1));
+                SliceAssigners.cumulative(
+                        2,
+                        TimeZone.getTimeZone("UTC"),
+                        Duration.ofSeconds(3),
+                        Duration.ofSeconds(1));
         final SumAndCountAggsFunction aggsFunction = new SumAndCountAggsFunction(assigner);
         SlicingWindowOperator<RowData, ?> operator =
                 SlicingWindowAggOperatorBuilder.builder()
@@ -382,9 +450,18 @@ public class SlicingWindowAggOperatorTest {
     }
 
     @Test
-    public void testProcessingTimeCumulativeWindows() throws Exception {
+    public void testProcessingTimeCumulativeWindowsInUTC() throws Exception {
+        testProcessingTimeCumulativeWindows(TimeZone.getTimeZone("UTC"));
+    }
+
+    @Test
+    public void testProcessingTimeCumulativeWindowsInShanghai() throws Exception {
+        testProcessingTimeCumulativeWindows(TimeZone.getTimeZone("Asia/Shanghai"));
+    }
+
+    private void testProcessingTimeCumulativeWindows(TimeZone timeZone) throws Exception {
         final SliceAssigner assigner =
-                SliceAssigners.cumulative(-1, Duration.ofSeconds(3), Duration.ofSeconds(1));
+                SliceAssigners.cumulative(-1, timeZone, Duration.ofDays(1), Duration.ofHours(8));
         final SumAndCountAggsFunction aggsFunction = new SumAndCountAggsFunction(assigner);
         SlicingWindowOperator<RowData, ?> operator =
                 SlicingWindowAggOperatorBuilder.builder()
@@ -404,12 +481,18 @@ public class SlicingWindowAggOperatorTest {
         ConcurrentLinkedQueue<Object> expectedOutput = new ConcurrentLinkedQueue<>();
 
         // timestamp is ignored in processing time
-        testHarness.setProcessingTime(3);
+        testHarness.setProcessingTime(epochMills(timeZone, "1970-01-01T00:00:00.003"));
         testHarness.processElement(insertRecord("key2", 1, Long.MAX_VALUE));
 
-        testHarness.setProcessingTime(1000);
+        testHarness.setProcessingTime(epochMills(timeZone, "1970-01-01T08:00:00"));
 
-        expectedOutput.add(insertRecord("key2", 1L, 1L, 0L, 1000L));
+        expectedOutput.add(
+                insertRecord(
+                        "key2",
+                        1L,
+                        1L,
+                        epochMills(timeZone, "1970-01-01T00:00:00"),
+                        epochMills(timeZone, "1970-01-01T08:00:00")));
 
         ASSERTER.assertOutputEqualsSorted(
                 "Output was not correct.", expectedOutput, testHarness.getOutput());
@@ -417,19 +500,37 @@ public class SlicingWindowAggOperatorTest {
         testHarness.processElement(insertRecord("key2", 1, Long.MAX_VALUE));
         testHarness.processElement(insertRecord("key2", 1, Long.MAX_VALUE));
 
-        testHarness.setProcessingTime(2000);
+        testHarness.setProcessingTime(epochMills(timeZone, "1970-01-01T16:00:00"));
 
-        expectedOutput.add(insertRecord("key2", 3L, 3L, 0L, 2000L));
+        expectedOutput.add(
+                insertRecord(
+                        "key2",
+                        3L,
+                        3L,
+                        epochMills(timeZone, "1970-01-01T00:00:00"),
+                        epochMills(timeZone, "1970-01-01T16:00:00")));
         ASSERTER.assertOutputEqualsSorted(
                 "Output was not correct.", expectedOutput, testHarness.getOutput());
 
         testHarness.processElement(insertRecord("key1", 1, Long.MAX_VALUE));
         testHarness.processElement(insertRecord("key1", 1, Long.MAX_VALUE));
 
-        testHarness.setProcessingTime(3000);
+        testHarness.setProcessingTime(epochMills(timeZone, "1970-01-02T00:00:00"));
 
-        expectedOutput.add(insertRecord("key2", 3L, 3L, 0L, 3000L));
-        expectedOutput.add(insertRecord("key1", 2L, 2L, 0L, 3000L));
+        expectedOutput.add(
+                insertRecord(
+                        "key2",
+                        3L,
+                        3L,
+                        epochMills(timeZone, "1970-01-01T00:00:00"),
+                        epochMills(timeZone, "1970-01-02T00:00:00")));
+        expectedOutput.add(
+                insertRecord(
+                        "key1",
+                        2L,
+                        2L,
+                        epochMills(timeZone, "1970-01-01T00:00:00"),
+                        epochMills(timeZone, "1970-01-02T00:00:00")));
 
         ASSERTER.assertOutputEqualsSorted(
                 "Output was not correct.", expectedOutput, testHarness.getOutput());
@@ -438,14 +539,50 @@ public class SlicingWindowAggOperatorTest {
         testHarness.processElement(insertRecord("key2", 1, Long.MAX_VALUE));
         testHarness.processElement(insertRecord("key1", 1, Long.MAX_VALUE));
 
-        testHarness.setProcessingTime(7000);
+        testHarness.setProcessingTime(epochMills(timeZone, "1970-01-03T08:00:00"));
 
-        expectedOutput.add(insertRecord("key1", 2L, 2L, 3000L, 4000L));
-        expectedOutput.add(insertRecord("key2", 1L, 1L, 3000L, 4000L));
-        expectedOutput.add(insertRecord("key1", 2L, 2L, 3000L, 5000L));
-        expectedOutput.add(insertRecord("key2", 1L, 1L, 3000L, 5000L));
-        expectedOutput.add(insertRecord("key1", 2L, 2L, 3000L, 6000L));
-        expectedOutput.add(insertRecord("key2", 1L, 1L, 3000L, 6000L));
+        expectedOutput.add(
+                insertRecord(
+                        "key1",
+                        2L,
+                        2L,
+                        epochMills(timeZone, "1970-01-02T00:00:00"),
+                        epochMills(timeZone, "1970-01-02T08:00:00")));
+        expectedOutput.add(
+                insertRecord(
+                        "key2",
+                        1L,
+                        1L,
+                        epochMills(timeZone, "1970-01-02T00:00:00"),
+                        epochMills(timeZone, "1970-01-02T08:00:00")));
+        expectedOutput.add(
+                insertRecord(
+                        "key1",
+                        2L,
+                        2L,
+                        epochMills(timeZone, "1970-01-02T00:00:00"),
+                        epochMills(timeZone, "1970-01-02T16:00:00")));
+        expectedOutput.add(
+                insertRecord(
+                        "key2",
+                        1L,
+                        1L,
+                        epochMills(timeZone, "1970-01-02T00:00:00"),
+                        epochMills(timeZone, "1970-01-02T16:00:00")));
+        expectedOutput.add(
+                insertRecord(
+                        "key1",
+                        2L,
+                        2L,
+                        epochMills(timeZone, "1970-01-02T00:00:00"),
+                        epochMills(timeZone, "1970-01-03T00:00:00")));
+        expectedOutput.add(
+                insertRecord(
+                        "key2",
+                        1L,
+                        1L,
+                        epochMills(timeZone, "1970-01-02T00:00:00"),
+                        epochMills(timeZone, "1970-01-03T00:00:00")));
 
         ASSERTER.assertOutputEqualsSorted(
                 "Output was not correct.", expectedOutput, testHarness.getOutput());
@@ -456,7 +593,8 @@ public class SlicingWindowAggOperatorTest {
 
     @Test
     public void testEventTimeTumblingWindows() throws Exception {
-        final SliceAssigner assigner = SliceAssigners.tumbling(2, Duration.ofSeconds(3));
+        final SliceAssigner assigner =
+                SliceAssigners.tumbling(2, TimeZone.getTimeZone("UTC"), Duration.ofSeconds(3));
         final SumAndCountAggsFunction aggsFunction = new SumAndCountAggsFunction(assigner);
         SlicingWindowOperator<RowData, ?> operator =
                 SlicingWindowAggOperatorBuilder.builder()
@@ -555,8 +693,23 @@ public class SlicingWindowAggOperatorTest {
     }
 
     @Test
-    public void testProcessingTimeTumblingWindows() throws Exception {
-        final SliceAssigner assigner = SliceAssigners.tumbling(-1, Duration.ofSeconds(3));
+    public void testProcessingTimeTumblingWindowsInUTC() throws Exception {
+        testProcessingTimeTumblingWindows(TimeZone.getTimeZone("UTC"));
+    }
+
+    @Test
+    public void testProcessingTimeTumblingWindowsInShanghai() throws Exception {
+        testProcessingTimeTumblingWindows(TimeZone.getTimeZone("Asia/Shanghai"));
+    }
+
+    private void testProcessingTimeTumblingWindows(TimeZone timeZone) throws Exception {
+
+        final SliceAssigner assigner = SliceAssigners.tumbling(-1, timeZone, Duration.ofHours(5));
+        // the assigned windows should like as following, e.g. the given timeZone is UTC+8:
+        //  local windows(timestamp in UTC+8)   <=>  epoch windows(timestamp in UTC+0)
+        // [1970-01-01 00:00, 1970-01-01 05:00] <=> [1969-12-31 16:00, 1969-12-31 21:00]
+        // [1970-01-01 05:00, 1970-01-01 10:00] <=> [1969-12-31 21:00, 1970-01-01 02:00]
+
         final SumAndCountAggsFunction aggsFunction = new SumAndCountAggsFunction(assigner);
         SlicingWindowOperator<RowData, ?> operator =
                 SlicingWindowAggOperatorBuilder.builder()
@@ -575,7 +728,7 @@ public class SlicingWindowAggOperatorTest {
         // process elements
         ConcurrentLinkedQueue<Object> expectedOutput = new ConcurrentLinkedQueue<>();
 
-        testHarness.setProcessingTime(3);
+        testHarness.setProcessingTime(epochMills(timeZone, "1970-01-01T00:00:00.003"));
 
         // timestamp is ignored in processing time
         testHarness.processElement(insertRecord("key2", 1, Long.MAX_VALUE));
@@ -585,10 +738,22 @@ public class SlicingWindowAggOperatorTest {
         testHarness.processElement(insertRecord("key1", 1, 7000L));
         testHarness.processElement(insertRecord("key1", 1, 7000L));
 
-        testHarness.setProcessingTime(5000);
+        testHarness.setProcessingTime(epochMills(timeZone, "1970-01-01T05:00:00"));
 
-        expectedOutput.add(insertRecord("key2", 3L, 3L, 0L, 3000L));
-        expectedOutput.add(insertRecord("key1", 2L, 2L, 0L, 3000L));
+        expectedOutput.add(
+                insertRecord(
+                        "key2",
+                        3L,
+                        3L,
+                        epochMills(timeZone, "1970-01-01T00:00:00"),
+                        epochMills(timeZone, "1970-01-01T05:00:00")));
+        expectedOutput.add(
+                insertRecord(
+                        "key1",
+                        2L,
+                        2L,
+                        epochMills(timeZone, "1970-01-01T00:00:00"),
+                        epochMills(timeZone, "1970-01-01T05:00:00")));
 
         ASSERTER.assertOutputEqualsSorted(
                 "Output was not correct.", expectedOutput, testHarness.getOutput());
@@ -597,21 +762,30 @@ public class SlicingWindowAggOperatorTest {
         testHarness.processElement(insertRecord("key1", 1, 7000L));
         testHarness.processElement(insertRecord("key1", 1, 7000L));
 
-        testHarness.setProcessingTime(7000);
+        testHarness.setProcessingTime(epochMills(timeZone, "1970-01-01T10:00:01"));
 
-        expectedOutput.add(insertRecord("key1", 3L, 3L, 3000L, 6000L));
+        expectedOutput.add(
+                insertRecord(
+                        "key1",
+                        3L,
+                        3L,
+                        epochMills(timeZone, "1970-01-01T05:00:00"),
+                        epochMills(timeZone, "1970-01-01T10:00:00")));
 
         assertEquals(Long.valueOf(0L), operator.getWatermarkLatency().getValue());
         ASSERTER.assertOutputEqualsSorted(
                 "Output was not correct.", expectedOutput, testHarness.getOutput());
-
         testHarness.close();
     }
 
     @Test
     public void testInvalidWindows() {
         final SliceAssigner assigner =
-                SliceAssigners.hopping(2, Duration.ofSeconds(3), Duration.ofSeconds(1));
+                SliceAssigners.hopping(
+                        2,
+                        TimeZone.getTimeZone("UTC"),
+                        Duration.ofSeconds(3),
+                        Duration.ofSeconds(1));
         final SumAndCountAggsFunction aggsFunction = new SumAndCountAggsFunction(assigner);
 
         try {
@@ -783,5 +957,12 @@ public class SlicingWindowAggOperatorTest {
             row.setField(3, window);
             return row;
         }
+    }
+
+    /** Get epoch mills from a timestamp string and the time zone the timestamp belonged to. */
+    private static long epochMills(TimeZone timeZone, String timestampStr) {
+        LocalDateTime localDateTime = LocalDateTime.parse(timestampStr);
+        ZoneOffset zoneOffset = timeZone.toZoneId().getRules().getOffset(localDateTime);
+        return localDateTime.toInstant(zoneOffset).toEpochMilli();
     }
 }

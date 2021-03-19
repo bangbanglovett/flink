@@ -20,7 +20,7 @@ package org.apache.flink.table.runtime.operators.window.slicing;
 
 import org.apache.flink.annotation.Internal;
 import org.apache.flink.table.data.RowData;
-import org.apache.flink.table.runtime.operators.window.TimeWindow;
+import org.apache.flink.table.runtime.util.TimeWindowUtil;
 import org.apache.flink.util.IterableIterator;
 import org.apache.flink.util.MathUtils;
 
@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
+import java.util.TimeZone;
 import java.util.function.Supplier;
 
 import static org.apache.flink.util.Preconditions.checkArgument;
@@ -50,10 +51,13 @@ public final class SliceAssigners {
      *
      * @param rowtimeIndex the index of rowtime field in the input row, {@code -1} if based on
      *     processing time.
+     * @param timeZone the timeZone used to calculate the window start and end which are shifted by
+     *     the timeZone offset with UTC+0 timeZone, UTC timeZone by default.
      * @param size the size of the generated windows.
      */
-    public static TumblingSliceAssigner tumbling(int rowtimeIndex, Duration size) {
-        return new TumblingSliceAssigner(rowtimeIndex, size.toMillis(), 0);
+    public static TumblingSliceAssigner tumbling(
+            int rowtimeIndex, TimeZone timeZone, Duration size) {
+        return new TumblingSliceAssigner(rowtimeIndex, timeZone, size.toMillis(), 0);
     }
 
     /**
@@ -62,11 +66,14 @@ public final class SliceAssigners {
      *
      * @param rowtimeIndex the index of rowtime field in the input row, {@code -1} if based on *
      *     processing time.
-     * @param size the size of the generated windows.
+     * @param timeZone the timeZone used to calculate the window start and end which are shifted by
+     *     the timeZone offset with UTC+0 timeZone, UTC timeZone by default.
      * @param slide the slide interval of the generated windows.
      */
-    public static HoppingSliceAssigner hopping(int rowtimeIndex, Duration size, Duration slide) {
-        return new HoppingSliceAssigner(rowtimeIndex, size.toMillis(), slide.toMillis(), 0);
+    public static HoppingSliceAssigner hopping(
+            int rowtimeIndex, TimeZone timeZone, Duration size, Duration slide) {
+        return new HoppingSliceAssigner(
+                rowtimeIndex, timeZone, size.toMillis(), slide.toMillis(), 0);
     }
 
     /**
@@ -75,12 +82,14 @@ public final class SliceAssigners {
      *
      * @param rowtimeIndex the index of rowtime field in the input row, {@code -1} if based on *
      *     processing time.
-     * @param maxSize the max size of the generated windows.
+     * @param timeZone the timeZone used to calculate the window start and end which are shifted by
+     *     the timeZone offset with UTC+0 timeZone, UTC timeZone by default.
      * @param step the step interval of the generated windows.
      */
     public static CumulativeSliceAssigner cumulative(
-            int rowtimeIndex, Duration maxSize, Duration step) {
-        return new CumulativeSliceAssigner(rowtimeIndex, maxSize.toMillis(), step.toMillis(), 0);
+            int rowtimeIndex, TimeZone timeZone, Duration maxSize, Duration step) {
+        return new CumulativeSliceAssigner(
+                rowtimeIndex, timeZone, maxSize.toMillis(), step.toMillis(), 0);
     }
 
     /**
@@ -106,15 +115,15 @@ public final class SliceAssigners {
 
         /** Creates a new {@link TumblingSliceAssigner} with a new specified offset. */
         public TumblingSliceAssigner withOffset(Duration offset) {
-            return new TumblingSliceAssigner(rowtimeIndex, size, offset.toMillis());
+            return new TumblingSliceAssigner(rowtimeIndex, timeZone, size, offset.toMillis());
         }
 
         private final long size;
         private final long offset;
         private final ReusableListIterable reuseExpiredList = new ReusableListIterable();
 
-        private TumblingSliceAssigner(int rowtimeIndex, long size, long offset) {
-            super(rowtimeIndex);
+        private TumblingSliceAssigner(int rowtimeIndex, TimeZone timeZone, long size, long offset) {
+            super(rowtimeIndex, timeZone);
             checkArgument(
                     size > 0,
                     String.format(
@@ -131,12 +140,12 @@ public final class SliceAssigners {
 
         @Override
         public long assignSliceEnd(long timestamp) {
-            long start = TimeWindow.getWindowStartWithOffset(timestamp, offset, size);
-            return start + size;
+            long start = TimeWindowUtil.getWindowStartWithOffset(timestamp, offset, size, timeZone);
+            return TimeWindowUtil.windowPlus(start, size, timeZone);
         }
 
         public long getWindowStart(long windowEnd) {
-            return windowEnd - size;
+            return TimeWindowUtil.windowMinus(windowEnd, size, timeZone);
         }
 
         @Override
@@ -153,7 +162,7 @@ public final class SliceAssigners {
 
         /** Creates a new {@link HoppingSliceAssigner} with a new specified offset. */
         public HoppingSliceAssigner withOffset(Duration offset) {
-            return new HoppingSliceAssigner(rowtimeIndex, size, slide, offset.toMillis());
+            return new HoppingSliceAssigner(rowtimeIndex, timeZone, size, slide, offset.toMillis());
         }
 
         private final long size;
@@ -163,8 +172,9 @@ public final class SliceAssigners {
         private final int numSlicesPerWindow;
         private final ReusableListIterable reuseExpiredList = new ReusableListIterable();
 
-        protected HoppingSliceAssigner(int rowtimeIndex, long size, long slide, long offset) {
-            super(rowtimeIndex);
+        protected HoppingSliceAssigner(
+                int rowtimeIndex, TimeZone timeZone, long size, long slide, long offset) {
+            super(rowtimeIndex, timeZone);
             if (size <= 0 || slide <= 0) {
                 throw new IllegalArgumentException(
                         String.format(
@@ -186,13 +196,14 @@ public final class SliceAssigners {
 
         @Override
         public long assignSliceEnd(long timestamp) {
-            long start = TimeWindow.getWindowStartWithOffset(timestamp, offset, sliceSize);
-            return start + sliceSize;
+            long start =
+                    TimeWindowUtil.getWindowStartWithOffset(timestamp, offset, sliceSize, timeZone);
+            return TimeWindowUtil.windowPlus(start, sliceSize, timeZone);
         }
 
         @Override
         public long getWindowStart(long windowEnd) {
-            return windowEnd - size;
+            return TimeWindowUtil.windowMinus(windowEnd, size, timeZone);
         }
 
         @Override
@@ -230,7 +241,8 @@ public final class SliceAssigners {
 
         /** Creates a new {@link CumulativeSliceAssigner} with a new specified offset. */
         public CumulativeSliceAssigner withOffset(Duration offset) {
-            return new CumulativeSliceAssigner(rowtimeIndex, maxSize, step, offset.toMillis());
+            return new CumulativeSliceAssigner(
+                    rowtimeIndex, timeZone, maxSize, step, offset.toMillis());
         }
 
         private final long maxSize;
@@ -239,8 +251,9 @@ public final class SliceAssigners {
         private final ReusableListIterable reuseToBeMergedList = new ReusableListIterable();
         private final ReusableListIterable reuseExpiredList = new ReusableListIterable();
 
-        protected CumulativeSliceAssigner(int rowtimeIndex, long maxSize, long step, long offset) {
-            super(rowtimeIndex);
+        protected CumulativeSliceAssigner(
+                int rowtimeIndex, TimeZone timeZone, long maxSize, long step, long offset) {
+            super(rowtimeIndex, timeZone);
             if (maxSize <= 0 || step <= 0) {
                 throw new IllegalArgumentException(
                         String.format(
@@ -261,13 +274,14 @@ public final class SliceAssigners {
 
         @Override
         public long assignSliceEnd(long timestamp) {
-            long start = TimeWindow.getWindowStartWithOffset(timestamp, offset, step);
-            return start + step;
+            long start = TimeWindowUtil.getWindowStartWithOffset(timestamp, offset, step, timeZone);
+            return TimeWindowUtil.windowPlus(start, step, timeZone);
         }
 
         @Override
         public long getWindowStart(long windowEnd) {
-            return TimeWindow.getWindowStartWithOffset(windowEnd - 1, offset, maxSize);
+            return TimeWindowUtil.getWindowStartWithOffset(
+                    windowEnd - 1, offset, maxSize, timeZone);
         }
 
         @Override
@@ -361,10 +375,12 @@ public final class SliceAssigners {
         private static final long serialVersionUID = 1L;
 
         protected final int rowtimeIndex;
+        protected final TimeZone timeZone;
         protected final boolean isEventTime;
 
-        protected AbstractSliceAssigner(int rowtimeIndex) {
+        protected AbstractSliceAssigner(int rowtimeIndex, TimeZone timeZone) {
             this.rowtimeIndex = rowtimeIndex;
+            this.timeZone = timeZone;
             this.isEventTime = rowtimeIndex >= 0;
         }
 

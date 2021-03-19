@@ -38,6 +38,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
+import java.util.TimeZone;
 import java.util.TreeSet;
 
 import static org.hamcrest.Matchers.anyOf;
@@ -97,7 +98,9 @@ public class MergingWindowSetTest {
 
         MergingWindowSet<TimeWindow> windowSet =
                 new MergingWindowSet<>(
-                        SessionWindowAssigner.withGap(Duration.ofMillis(3)), mockState);
+                        SessionWindowAssigner.withGap(
+                                Duration.ofMillis(3), TimeZone.getTimeZone("UTC")),
+                        mockState);
         windowSet.initializeCache("key1");
 
         TestingMergeFunction mergeFunction = new TestingMergeFunction();
@@ -212,7 +215,9 @@ public class MergingWindowSetTest {
 
         MergingWindowSet<TimeWindow> windowSet =
                 new MergingWindowSet<>(
-                        SessionWindowAssigner.withGap(Duration.ofMillis(3)), mockState);
+                        SessionWindowAssigner.withGap(
+                                Duration.ofMillis(3), TimeZone.getTimeZone("UTC")),
+                        mockState);
         windowSet.initializeCache("key1");
 
         TestingMergeFunction mergeFunction = new TestingMergeFunction();
@@ -315,7 +320,9 @@ public class MergingWindowSetTest {
 
         MergingWindowSet<TimeWindow> windowSet =
                 new MergingWindowSet<>(
-                        SessionWindowAssigner.withGap(Duration.ofMillis(3)), mockState);
+                        SessionWindowAssigner.withGap(
+                                Duration.ofMillis(3), TimeZone.getTimeZone("UTC")),
+                        mockState);
         windowSet.initializeCache("key1");
 
         TestingMergeFunction mergeFunction = new TestingMergeFunction();
@@ -347,7 +354,9 @@ public class MergingWindowSetTest {
 
         MergingWindowSet<TimeWindow> windowSet =
                 new MergingWindowSet<>(
-                        SessionWindowAssigner.withGap(Duration.ofMillis(3)), mockState);
+                        SessionWindowAssigner.withGap(
+                                Duration.ofMillis(3), TimeZone.getTimeZone("UTC")),
+                        mockState);
         windowSet.initializeCache("key1");
 
         TestingMergeFunction mergeFunction = new TestingMergeFunction();
@@ -372,7 +381,9 @@ public class MergingWindowSetTest {
 
         MergingWindowSet<TimeWindow> windowSet =
                 new MergingWindowSet<>(
-                        SessionWindowAssigner.withGap(Duration.ofMillis(3)), mockState);
+                        SessionWindowAssigner.withGap(
+                                Duration.ofMillis(3), TimeZone.getTimeZone("UTC")),
+                        mockState);
         windowSet.initializeCache("key1");
 
         TestingMergeFunction mergeFunction = new TestingMergeFunction();

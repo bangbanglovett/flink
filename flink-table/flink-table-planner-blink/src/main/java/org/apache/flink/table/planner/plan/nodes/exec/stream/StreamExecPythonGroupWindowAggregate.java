@@ -63,6 +63,7 @@ import org.apache.flink.table.runtime.operators.window.triggers.EventTimeTrigger
 import org.apache.flink.table.runtime.operators.window.triggers.ProcessingTimeTriggers;
 import org.apache.flink.table.runtime.operators.window.triggers.Trigger;
 import org.apache.flink.table.runtime.typeutils.InternalTypeInfo;
+import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.table.types.logical.RowType;
 
 import org.apache.calcite.rel.core.AggregateCall;
@@ -73,6 +74,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.TimeZone;
 
 import static org.apache.flink.table.planner.plan.utils.AggregateUtil.hasRowIntervalType;
 import static org.apache.flink.table.planner.plan.utils.AggregateUtil.hasTimeIntervalType;
@@ -172,8 +174,17 @@ public class StreamExecPythonGroupWindowAggregate extends ExecNodeBase<RowData>
         } else {
             inputTimeFieldIndex = -1;
         }
+        // assign window based on the local time zone if time attribute type is TIMESTAMP_LTZ
+        final boolean needLocalTimeZone =
+                window.timeAttribute().getOutputDataType().getLogicalType().getTypeRoot()
+                        == LogicalTypeRoot.TIMESTAMP_WITH_LOCAL_TIME_ZONE;
+        final TimeZone timeZoneOfWindow =
+                needLocalTimeZone
+                        ? TimeZone.getTimeZone(tableConfig.getLocalTimeZone())
+                        : TimeZone.getTimeZone("UTC");
+
         Tuple2<WindowAssigner<?>, Trigger<?>> windowAssignerAndTrigger =
-                generateWindowAssignerAndTrigger();
+                generateWindowAssignerAndTrigger(timeZoneOfWindow);
         WindowAssigner<?> windowAssigner = windowAssignerAndTrigger.f0;
         Trigger<?> trigger = windowAssignerAndTrigger.f1;
         Configuration config = CommonPythonUtil.getMergedConfig(planner.getExecEnv(), tableConfig);
@@ -226,7 +237,8 @@ public class StreamExecPythonGroupWindowAggregate extends ExecNodeBase<RowData>
         return transform;
     }
 
-    private Tuple2<WindowAssigner<?>, Trigger<?>> generateWindowAssignerAndTrigger() {
+    private Tuple2<WindowAssigner<?>, Trigger<?>> generateWindowAssignerAndTrigger(
+            TimeZone timeZone) {
         WindowAssigner<?> windowAssiger;
         Trigger<?> trigger;
         if (window instanceof TumblingGroupWindow) {
@@ -234,10 +246,12 @@ public class StreamExecPythonGroupWindowAggregate extends ExecNodeBase<RowData>
             FieldReferenceExpression timeField = tumblingWindow.timeField();
             ValueLiteralExpression size = tumblingWindow.size();
             if (isProctimeAttribute(timeField) && hasTimeIntervalType(size)) {
-                windowAssiger = TumblingWindowAssigner.of(toDuration(size)).withProcessingTime();
+                windowAssiger =
+                        TumblingWindowAssigner.of(toDuration(size), timeZone).withProcessingTime();
                 trigger = ProcessingTimeTriggers.afterEndOfWindow();
             } else if (isRowtimeAttribute(timeField) && hasTimeIntervalType(size)) {
-                windowAssiger = TumblingWindowAssigner.of(toDuration(size)).withEventTime();
+                windowAssiger =
+                        TumblingWindowAssigner.of(toDuration(size), timeZone).withEventTime();
                 trigger = EventTimeTriggers.afterEndOfWindow();
             } else if (isProctimeAttribute(timeField) && hasRowIntervalType(size)) {
                 windowAssiger = CountTumblingWindowAssigner.of(toLong(size));
@@ -256,11 +270,12 @@ public class StreamExecPythonGroupWindowAggregate extends ExecNodeBase<RowData>
             ValueLiteralExpression slide = slidingWindow.slide();
             if (isProctimeAttribute(timeField) && hasTimeIntervalType(size)) {
                 windowAssiger =
-                        SlidingWindowAssigner.of(toDuration(size), toDuration(slide))
+                        SlidingWindowAssigner.of(toDuration(size), toDuration(slide), timeZone)
                                 .withProcessingTime();
                 trigger = ProcessingTimeTriggers.afterEndOfWindow();
             } else if (isRowtimeAttribute(timeField) && hasTimeIntervalType(size)) {
-                windowAssiger = SlidingWindowAssigner.of(toDuration(size), toDuration(slide));
+                windowAssiger =
+                        SlidingWindowAssigner.of(toDuration(size), toDuration(slide), timeZone);
                 trigger = EventTimeTriggers.afterEndOfWindow();
             } else if (isProctimeAttribute(timeField) && hasRowIntervalType(size)) {
                 windowAssiger = CountSlidingWindowAssigner.of(toLong(size), toLong(slide));
@@ -277,10 +292,10 @@ public class StreamExecPythonGroupWindowAggregate extends ExecNodeBase<RowData>
             FieldReferenceExpression timeField = sessionWindow.timeField();
             ValueLiteralExpression gap = sessionWindow.gap();
             if (isProctimeAttribute(timeField)) {
-                windowAssiger = SessionWindowAssigner.withGap(toDuration(gap));
+                windowAssiger = SessionWindowAssigner.withGap(toDuration(gap), timeZone);
                 trigger = ProcessingTimeTriggers.afterEndOfWindow();
             } else if (isRowtimeAttribute(timeField)) {
-                windowAssiger = SessionWindowAssigner.withGap(toDuration(gap));
+                windowAssiger = SessionWindowAssigner.withGap(toDuration(gap), timeZone);
                 trigger = EventTimeTriggers.afterEndOfWindow();
             } else {
                 throw new UnsupportedOperationException("This should not happen.");

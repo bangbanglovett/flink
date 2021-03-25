@@ -436,6 +436,7 @@ public final class MinWithRetractAggFunctionTest {
             return new MinWithRetractAggFunction<>(DataTypes.TIMESTAMP_LTZ(9).getLogicalType());
         }
     }
+
     /** Test for {@link DateType}. */
     public static final class DateMinWithRetractAggFunctionTest
             extends MinWithRetractAggFunctionTestBase<Integer> {

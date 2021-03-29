@@ -56,9 +56,9 @@ import org.apache.flink.table.runtime.operators.window.WindowOperator;
 import org.apache.flink.table.runtime.operators.window.WindowOperatorBuilder;
 import org.apache.flink.table.runtime.types.LogicalTypeDataTypeConverter;
 import org.apache.flink.table.runtime.typeutils.InternalTypeInfo;
+import org.apache.flink.table.runtime.util.TimeWindowUtil;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.LogicalType;
-import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.table.types.logical.RowType;
 
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonCreator;
@@ -77,7 +77,6 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.TimeZone;
 
 import static org.apache.flink.table.planner.plan.utils.AggregateUtil.hasRowIntervalType;
 import static org.apache.flink.table.planner.plan.utils.AggregateUtil.hasTimeIntervalType;
@@ -209,6 +208,10 @@ public class StreamExecGroupWindowAggregate extends StreamExecAggregateBase {
             inputTimeFieldIndex = -1;
         }
 
+        final String shiftTimeZone =
+                TimeWindowUtil.getShiftTimeZone(
+                        window.timeAttribute().getOutputDataType().getLogicalType(), config);
+
         final boolean[] aggCallNeedRetractions = new boolean[aggCalls.length];
         Arrays.fill(aggCallNeedRetractions, needRetraction);
         final AggregateInfoList aggInfoList =
@@ -222,7 +225,11 @@ public class StreamExecGroupWindowAggregate extends StreamExecAggregateBase {
 
         final GeneratedClass<?> aggCodeGenerator =
                 createAggsHandler(
-                        aggInfoList, config, planner.getRelBuilder(), inputRowType.getChildren());
+                        aggInfoList,
+                        config,
+                        planner.getRelBuilder(),
+                        inputRowType.getChildren(),
+                        shiftTimeZone);
 
         final LogicalType[] aggResultTypes = extractLogicalTypes(aggInfoList.getActualValueTypes());
         final LogicalType[] windowPropertyTypes =
@@ -238,14 +245,6 @@ public class StreamExecGroupWindowAggregate extends StreamExecAggregateBase {
         final LogicalType[] aggValueTypes = extractLogicalTypes(aggInfoList.getActualValueTypes());
         final LogicalType[] accTypes = extractLogicalTypes(aggInfoList.getAccTypes());
 
-        // assign window based on the local time zone if time attribute type is TIMESTAMP_LTZ
-        final boolean needLocalTimeZone =
-                window.timeAttribute().getOutputDataType().getLogicalType().getTypeRoot()
-                        == LogicalTypeRoot.TIMESTAMP_WITH_LOCAL_TIME_ZONE;
-        final TimeZone timeZoneOfWindow =
-                needLocalTimeZone
-                        ? TimeZone.getTimeZone(config.getLocalTimeZone())
-                        : TimeZone.getTimeZone("UTC");
         final WindowOperator<?, ?> operator =
                 createWindowOperator(
                         planner.getTableConfig(),
@@ -256,7 +255,7 @@ public class StreamExecGroupWindowAggregate extends StreamExecAggregateBase {
                         aggValueTypes,
                         inputRowType.getChildren().toArray(new LogicalType[0]),
                         inputTimeFieldIndex,
-                        timeZoneOfWindow);
+                        shiftTimeZone);
 
         final OneInputTransformation<RowData, RowData> transform =
                 new OneInputTransformation<>(
@@ -284,7 +283,8 @@ public class StreamExecGroupWindowAggregate extends StreamExecAggregateBase {
             AggregateInfoList aggInfoList,
             TableConfig config,
             RelBuilder relBuilder,
-            List<LogicalType> fieldTypes) {
+            List<LogicalType> fieldTypes,
+            String shiftTimeZone) {
         final boolean needMerge;
         final Class<?> windowClass;
         if (window instanceof SlidingGroupWindow) {
@@ -329,13 +329,15 @@ public class StreamExecGroupWindowAggregate extends StreamExecAggregateBase {
                     "GroupingWindowTableAggsHandler",
                     aggInfoList,
                     JavaScalaConversionUtil.toScala(windowProperties),
-                    windowClass);
+                    windowClass,
+                    shiftTimeZone);
         } else {
             return generator.generateNamespaceAggsHandler(
                     "GroupingWindowAggsHandler",
                     aggInfoList,
                     JavaScalaConversionUtil.toScala(windowProperties),
-                    windowClass);
+                    windowClass,
+                    shiftTimeZone);
         }
     }
 
@@ -348,18 +350,20 @@ public class StreamExecGroupWindowAggregate extends StreamExecAggregateBase {
             LogicalType[] aggValueTypes,
             LogicalType[] inputFields,
             int timeFieldIndex,
-            TimeZone timeZone) {
+            String shiftTimeZone) {
         WindowOperatorBuilder builder =
-                WindowOperatorBuilder.builder().withInputFields(inputFields);
+                WindowOperatorBuilder.builder()
+                        .withInputFields(inputFields)
+                        .withShiftTimezone(shiftTimeZone);
 
         if (window instanceof TumblingGroupWindow) {
             TumblingGroupWindow tumblingWindow = (TumblingGroupWindow) window;
             FieldReferenceExpression timeField = tumblingWindow.timeField();
             ValueLiteralExpression size = tumblingWindow.size();
             if (isProctimeAttribute(timeField) && hasTimeIntervalType(size)) {
-                builder = builder.tumble(toDuration(size), timeZone).withProcessingTime();
+                builder = builder.tumble(toDuration(size)).withProcessingTime();
             } else if (isRowtimeAttribute(timeField) && hasTimeIntervalType(size)) {
-                builder = builder.tumble(toDuration(size), timeZone).withEventTime(timeFieldIndex);
+                builder = builder.tumble(toDuration(size)).withEventTime(timeFieldIndex);
             } else if (isProctimeAttribute(timeField) && hasRowIntervalType(size)) {
                 builder = builder.countWindow(toLong(size));
             } else {
@@ -375,12 +379,10 @@ public class StreamExecGroupWindowAggregate extends StreamExecAggregateBase {
             ValueLiteralExpression size = slidingWindow.size();
             ValueLiteralExpression slide = slidingWindow.slide();
             if (isProctimeAttribute(timeField) && hasTimeIntervalType(size)) {
-                builder =
-                        builder.sliding(toDuration(size), toDuration(slide), timeZone)
-                                .withProcessingTime();
+                builder = builder.sliding(toDuration(size), toDuration(slide)).withProcessingTime();
             } else if (isRowtimeAttribute(timeField) && hasTimeIntervalType(size)) {
                 builder =
-                        builder.sliding(toDuration(size), toDuration(slide), timeZone)
+                        builder.sliding(toDuration(size), toDuration(slide))
                                 .withEventTime(timeFieldIndex);
             } else if (isProctimeAttribute(timeField) && hasRowIntervalType(size)) {
                 builder = builder.countWindow(toLong(size), toLong(slide));
@@ -396,9 +398,9 @@ public class StreamExecGroupWindowAggregate extends StreamExecAggregateBase {
             FieldReferenceExpression timeField = sessionWindow.timeField();
             ValueLiteralExpression gap = sessionWindow.gap();
             if (isProctimeAttribute(timeField)) {
-                builder = builder.session(toDuration(gap), timeZone).withProcessingTime();
+                builder = builder.session(toDuration(gap)).withProcessingTime();
             } else if (isRowtimeAttribute(timeField)) {
-                builder = builder.session(toDuration(gap), timeZone).withEventTime(timeFieldIndex);
+                builder = builder.session(toDuration(gap)).withEventTime(timeFieldIndex);
             } else {
                 throw new UnsupportedOperationException("This should not happen.");
             }

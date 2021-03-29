@@ -120,6 +120,10 @@ public final class LogicalTypeChecks {
         return logicalType.accept(TIMESTAMP_KIND_EXTRACTOR) == TimestampKind.PROCTIME;
     }
 
+    public static boolean isTimestampLtzType(LogicalType logicalType) {
+        return logicalType instanceof LocalZonedTimestampType;
+    }
+
     /**
      * Checks if the given type is a composite type.
      *

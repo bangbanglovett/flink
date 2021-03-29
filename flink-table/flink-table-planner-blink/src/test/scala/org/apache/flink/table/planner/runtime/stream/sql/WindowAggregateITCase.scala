@@ -24,7 +24,7 @@ import org.apache.flink.streaming.api.CheckpointingMode
 import org.apache.flink.table.api.bridge.scala._
 import org.apache.flink.table.planner.factories.TestValuesTableFactory
 import org.apache.flink.table.planner.plan.utils.JavaUserDefinedAggFunctions.ConcatDistinctAggFunction
-import org.apache.flink.table.planner.runtime.utils.StreamingWithStateTestBase.StateBackendMode
+import org.apache.flink.table.planner.runtime.utils.StreamingWithStateTestBase.{HEAP_BACKEND, ROCKSDB_BACKEND, StateBackendMode}
 import org.apache.flink.table.planner.runtime.utils.{FailingCollectionSource, StreamingWithStateTestBase, TestData, TestingAppendSink}
 import org.apache.flink.types.Row
 
@@ -33,8 +33,13 @@ import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 import org.junit.{Before, Test}
 
+import java.util.{Collection => JCollection}
+import java.util.TimeZone
+
+import scala.collection.JavaConversions._
+
 @RunWith(classOf[Parameterized])
-class WindowAggregateITCase(mode: StateBackendMode)
+class WindowAggregateITCase(mode: StateBackendMode, timeZone: TimeZone)
   extends StreamingWithStateTestBase(mode) {
 
   // -------------------------------------------------------------------------------
@@ -130,6 +135,7 @@ class WindowAggregateITCase(mode: StateBackendMode)
     FailingCollectionSource.reset()
 
     val dataId = TestValuesTableFactory.registerData(TestData.windowData)
+    tEnv.getConfig.setLocalTimeZone(timeZone.toZoneId)
     tEnv.executeSql(
       s"""
         |CREATE TABLE T1 (
@@ -625,5 +631,16 @@ class WindowAggregateITCase(mode: StateBackendMode)
     assertEquals(
       CumulateWindowRollupExpectedData.sorted.mkString("\n"),
       sink.getAppendResults.sorted.mkString("\n"))
+  }
+}
+
+object WindowAggregateITCase {
+  @Parameterized.Parameters(name = "StateBackend={0}, TimeZone={1}")
+  def parameters(): JCollection[Array[Object]] = {
+    Seq[Array[AnyRef]](
+      Array(HEAP_BACKEND, TimeZone.getTimeZone("UTC")),
+      Array(HEAP_BACKEND, TimeZone.getTimeZone("Asia/Shanghai")),
+      Array(ROCKSDB_BACKEND, TimeZone.getTimeZone("UTC")),
+      Array(ROCKSDB_BACKEND, TimeZone.getTimeZone("Asia/Shanghai")))
   }
 }

@@ -18,9 +18,7 @@
 
 package org.apache.flink.table.planner.expressions;
 
-import org.apache.flink.table.types.logical.LocalZonedTimestampType;
 import org.apache.flink.table.types.logical.LogicalType;
-import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.table.types.logical.TimestampType;
 
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonCreator;
@@ -38,13 +36,7 @@ public class PlannerWindowEnd extends AbstractPlannerWindowProperty {
 
     @Override
     public LogicalType getResultType() {
-        if (reference.getType().isPresent()
-                && reference.getType().get().getTypeRoot()
-                        == LogicalTypeRoot.TIMESTAMP_WITH_LOCAL_TIME_ZONE) {
-            return new LocalZonedTimestampType(true, 3);
-        } else {
-            return new TimestampType(true, 3);
-        }
+        return new TimestampType(3);
     }
 
     @Override

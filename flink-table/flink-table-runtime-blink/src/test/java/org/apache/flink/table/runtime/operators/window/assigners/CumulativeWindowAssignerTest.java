@@ -27,13 +27,8 @@ import org.apache.flink.table.runtime.operators.window.TimeWindow;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
 
 import java.time.Duration;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.TimeZone;
 
 import static org.apache.flink.table.runtime.operators.window.WindowTestUtils.timeWindow;
 import static org.hamcrest.Matchers.contains;
@@ -44,16 +39,7 @@ import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 
 /** Tests for {@link CumulativeWindowAssigner}. */
-@RunWith(Parameterized.class)
 public class CumulativeWindowAssignerTest {
-
-    @Parameterized.Parameter public TimeZone timeZone;
-
-    @Parameterized.Parameters(name = "timezone = {0}")
-    public static Collection<TimeZone> parameters() {
-        return Arrays.asList(
-                TimeZone.getTimeZone("America/Los_Angeles"), TimeZone.getTimeZone("Asia/Shanghai"));
-    }
 
     private static final RowData ELEMENT = GenericRowData.of(StringData.fromString("String"));
 
@@ -63,8 +49,7 @@ public class CumulativeWindowAssignerTest {
     @Test
     public void testWindowAssignment() {
         CumulativeWindowAssigner assigner =
-                CumulativeWindowAssigner.of(
-                        Duration.ofMillis(5000), Duration.ofMillis(1000), timeZone);
+                CumulativeWindowAssigner.of(Duration.ofMillis(5000), Duration.ofMillis(1000));
 
         assertThat(
                 assigner.assignWindows(ELEMENT, 0L),
@@ -113,8 +98,7 @@ public class CumulativeWindowAssignerTest {
     @Test
     public void testWindowAssignmentWithOffset() {
         CumulativeWindowAssigner assigner =
-                CumulativeWindowAssigner.of(
-                                Duration.ofMillis(5000), Duration.ofMillis(1000), timeZone)
+                CumulativeWindowAssigner.of(Duration.ofMillis(5000), Duration.ofMillis(1000))
                         .withOffset(Duration.ofMillis(100));
 
         assertThat(
@@ -161,77 +145,30 @@ public class CumulativeWindowAssignerTest {
     }
 
     @Test
-    public void testDstSaving() {
-        if (!timeZone.useDaylightTime()) {
-            return;
-        }
-        CumulativeWindowAssigner assigner =
-                CumulativeWindowAssigner.of(Duration.ofHours(4), Duration.ofHours(1), timeZone);
-        // Los_Angeles local time in epoch mills.
-        // The DaylightTime in Los_Angele start at time 2021-03-14 02:00:00
-        // long epoch1 = 1615708800000L; 2021-03-14 00:00:00
-        // long epoch2 = 1615712400000L; 2021-03-14 01:00:00
-        // long epoch3 = 1615716000000L; 2021-03-14 03:00:00, skip one hour (2021-03-14 02:00:00)
-        // long epoch4 = 1615719600000L; 2021-03-14 04:00:00
-
-        long epoch1 = 1615708800000L;
-        assertThat(
-                assigner.assignWindows(ELEMENT, epoch1),
-                containsInAnyOrder(
-                        // 2021-03-14T00:00, 2021-03-14T01:00,
-                        // 2021-03-14T00:00, 2021-03-14T03:00,
-                        // 2021-03-14T00:00, 2021-03-14T04:00,
-                        timeWindow(1615708800000L, 1615712400000L),
-                        timeWindow(1615708800000L, 1615716000000L),
-                        timeWindow(1615708800000L, 1615719600000L)));
-        // Los_Angeles local time in epoch mills.
-        // The DaylightTime in Los_Angele end at time 2021-11-07 02:00:00
-        // long epoch5 = 1636268400000L;  2021-11-07 00:00:00
-        // long epoch6 = 1636272000000L; the first local timestamp 2021-11-07 01:00:00
-        // long epoch7 = 1636275600000L; rollback to  2021-11-07 01:00:00
-        // long epoch8 = 1636279200000L; 2021-11-07 02:00:00
-        // long epoch9 = 1636282800000L; 2021-11-07 03:00:00
-
-        long epoch5 = 1636268400000L;
-        assertThat(
-                assigner.assignWindows(ELEMENT, epoch5),
-                containsInAnyOrder(
-                        // 2021-11-07T00:00, 2021-11-07T01:00
-                        // 2021-11-07T00:00, 2021-11-07T02:00
-                        // 2021-11-07T00:00, 2021-11-07T03:00
-                        // 2021-11-07T00:00, 2021-11-07T04:00
-                        timeWindow(1636268400000L, 1636272000000L),
-                        timeWindow(1636268400000L, 1636279200000L),
-                        timeWindow(1636268400000L, 1636282800000L),
-                        timeWindow(1636268400000L, 1636286400000L)));
-    }
-
-    @Test
     public void testInvalidParameters1() {
         thrown.expect(IllegalArgumentException.class);
         thrown.expectMessage("step > 0 and size > 0");
-        CumulativeWindowAssigner.of(Duration.ofSeconds(-2), Duration.ofSeconds(1), timeZone);
+        CumulativeWindowAssigner.of(Duration.ofSeconds(-2), Duration.ofSeconds(1));
     }
 
     @Test
     public void testInvalidParameters2() {
         thrown.expect(IllegalArgumentException.class);
         thrown.expectMessage("step > 0 and size > 0");
-        CumulativeWindowAssigner.of(Duration.ofSeconds(2), Duration.ofSeconds(-1), timeZone);
+        CumulativeWindowAssigner.of(Duration.ofSeconds(2), Duration.ofSeconds(-1));
     }
 
     @Test
     public void testInvalidParameters3() {
         thrown.expect(IllegalArgumentException.class);
         thrown.expectMessage("size must be an integral multiple of step.");
-        CumulativeWindowAssigner.of(Duration.ofSeconds(5000), Duration.ofSeconds(2000), timeZone);
+        CumulativeWindowAssigner.of(Duration.ofSeconds(5000), Duration.ofSeconds(2000));
     }
 
     @Test
     public void testProperties() {
         CumulativeWindowAssigner assigner =
-                CumulativeWindowAssigner.of(
-                        Duration.ofMillis(5000), Duration.ofMillis(1000), timeZone);
+                CumulativeWindowAssigner.of(Duration.ofMillis(5000), Duration.ofMillis(1000));
 
         assertTrue(assigner.isEventTime());
         assertEquals(

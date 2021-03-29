@@ -59,7 +59,6 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.TimeZone;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -67,7 +66,6 @@ import static org.apache.flink.table.data.StringData.fromString;
 import static org.apache.flink.table.runtime.util.StreamRecordUtils.insertRecord;
 import static org.apache.flink.table.runtime.util.StreamRecordUtils.updateAfterRecord;
 import static org.apache.flink.table.runtime.util.StreamRecordUtils.updateBeforeRecord;
-import static org.apache.flink.table.runtime.util.TimeWindowUtil.windowPlus;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -87,8 +85,8 @@ public class WindowOperatorTest {
         return Arrays.asList(new Object[] {false}, new Object[] {true});
     }
 
-    private static final TimeZone UTC_TIMEZONE = TimeZone.getTimeZone("UTC");
-    private static final TimeZone SHANGHAI_TIMEZONE = TimeZone.getTimeZone("Asia/Shanghai");
+    private static final String UTC_TIMEZONE_ID = "UTC";
+    private static final String SHANGHAI_TIMEZONE_ID = "Asia/Shanghai";
 
     private final boolean isTableAggregate;
     private static final SumAndCountAggTimeWindow sumAndCountAggTimeWindow =
@@ -159,7 +157,7 @@ public class WindowOperatorTest {
         WindowOperator operator =
                 WindowOperatorBuilder.builder()
                         .withInputFields(inputFieldTypes)
-                        .sliding(Duration.ofSeconds(3), Duration.ofSeconds(1), UTC_TIMEZONE)
+                        .sliding(Duration.ofSeconds(3), Duration.ofSeconds(1))
                         .withEventTime(2)
                         .aggregateAndBuild(
                                 getTimeWindowAggFunction(),
@@ -261,21 +259,22 @@ public class WindowOperatorTest {
 
     @Test
     public void testProcessingTimeSlidingWindowsinUTC() throws Throwable {
-        testProcessingTimeSlidingWindows(UTC_TIMEZONE);
+        testProcessingTimeSlidingWindows(UTC_TIMEZONE_ID);
     }
 
     @Test
     public void testProcessingTimeSlidingWindowsinShanghai() throws Throwable {
-        testProcessingTimeSlidingWindows(SHANGHAI_TIMEZONE);
+        testProcessingTimeSlidingWindows(SHANGHAI_TIMEZONE_ID);
     }
 
-    private void testProcessingTimeSlidingWindows(TimeZone timeZoneOfWindow) throws Throwable {
+    private void testProcessingTimeSlidingWindows(String shiftTimeZone) throws Throwable {
         closeCalled.set(0);
 
         WindowOperator operator =
                 WindowOperatorBuilder.builder()
+                        .withShiftTimezone(shiftTimeZone)
                         .withInputFields(inputFieldTypes)
-                        .sliding(Duration.ofSeconds(3), Duration.ofSeconds(1), timeZoneOfWindow)
+                        .sliding(Duration.ofSeconds(3), Duration.ofSeconds(1))
                         .withProcessingTime()
                         .aggregateAndBuild(
                                 getTimeWindowAggFunction(),
@@ -354,7 +353,7 @@ public class WindowOperatorTest {
         WindowOperator operator =
                 WindowOperatorBuilder.builder()
                         .withInputFields(inputFieldTypes)
-                        .cumulative(Duration.ofSeconds(3), Duration.ofSeconds(1), UTC_TIMEZONE)
+                        .cumulative(Duration.ofSeconds(3), Duration.ofSeconds(1))
                         .withEventTime(2)
                         .aggregateAndBuild(
                                 getTimeWindowAggFunction(),
@@ -459,7 +458,7 @@ public class WindowOperatorTest {
         WindowOperator operator =
                 WindowOperatorBuilder.builder()
                         .withInputFields(inputFieldTypes)
-                        .cumulative(Duration.ofSeconds(3), Duration.ofSeconds(1), UTC_TIMEZONE)
+                        .cumulative(Duration.ofSeconds(3), Duration.ofSeconds(1))
                         .withEventTime(2)
                         .withAllowedLateness(Duration.ofMillis(500))
                         .produceUpdates()
@@ -516,21 +515,22 @@ public class WindowOperatorTest {
 
     @Test
     public void testProcessingTimeCumulativeWindowsInUTC() throws Throwable {
-        testProcessingTimeCumulativeWindows(UTC_TIMEZONE);
+        testProcessingTimeCumulativeWindows(UTC_TIMEZONE_ID);
     }
 
     @Test
     public void testProcessingTimeCumulativeWindowsInShangHai() throws Throwable {
-        testProcessingTimeCumulativeWindows(SHANGHAI_TIMEZONE);
+        testProcessingTimeCumulativeWindows(SHANGHAI_TIMEZONE_ID);
     }
 
-    private void testProcessingTimeCumulativeWindows(TimeZone timeZoneOfWindow) throws Throwable {
+    private void testProcessingTimeCumulativeWindows(String shiftTimeZone) throws Throwable {
         closeCalled.set(0);
 
         WindowOperator operator =
                 WindowOperatorBuilder.builder()
                         .withInputFields(inputFieldTypes)
-                        .cumulative(Duration.ofSeconds(3), Duration.ofSeconds(1), timeZoneOfWindow)
+                        .withShiftTimezone(shiftTimeZone)
+                        .cumulative(Duration.ofSeconds(3), Duration.ofSeconds(1))
                         .withProcessingTime()
                         .aggregateAndBuild(
                                 getTimeWindowAggFunction(),
@@ -614,7 +614,7 @@ public class WindowOperatorTest {
         WindowOperator operator =
                 WindowOperatorBuilder.builder()
                         .withInputFields(inputFieldTypes)
-                        .tumble(Duration.ofSeconds(3), UTC_TIMEZONE)
+                        .tumble(Duration.ofSeconds(3))
                         .withEventTime(2)
                         .aggregateAndBuild(
                                 getTimeWindowAggFunction(),
@@ -711,7 +711,7 @@ public class WindowOperatorTest {
         WindowOperator operator =
                 WindowOperatorBuilder.builder()
                         .withInputFields(inputFieldTypes)
-                        .tumble(Duration.ofSeconds(3), UTC_TIMEZONE)
+                        .tumble(Duration.ofSeconds(3))
                         .withEventTime(2)
                         .triggering(
                                 EventTimeTriggers.afterEndOfWindow()
@@ -847,7 +847,7 @@ public class WindowOperatorTest {
         WindowOperator operator =
                 WindowOperatorBuilder.builder()
                         .withInputFields(inputFieldTypes)
-                        .tumble(Duration.ofSeconds(3), UTC_TIMEZONE)
+                        .tumble(Duration.ofSeconds(3))
                         .withEventTime(2)
                         .triggering(
                                 EventTimeTriggers.afterEndOfWindow()
@@ -985,22 +985,23 @@ public class WindowOperatorTest {
 
     @Test
     public void testProcessingTimeTumblingWindowsInUTC() throws Exception {
-        testProcessingTimeTumblingWindows(UTC_TIMEZONE);
+        testProcessingTimeTumblingWindows(UTC_TIMEZONE_ID);
     }
 
     @Test
     public void testProcessingTimeTumblingWindowsInShanghai() throws Exception {
-        testProcessingTimeTumblingWindows(SHANGHAI_TIMEZONE);
+        testProcessingTimeTumblingWindows(SHANGHAI_TIMEZONE_ID);
     }
 
     @SuppressWarnings("unchecked")
-    private void testProcessingTimeTumblingWindows(TimeZone timeZoneOfWindow) throws Exception {
+    private void testProcessingTimeTumblingWindows(String shiftTimeZone) throws Exception {
         closeCalled.set(0);
 
         WindowOperator operator =
                 WindowOperatorBuilder.builder()
                         .withInputFields(inputFieldTypes)
-                        .tumble(Duration.ofSeconds(3), UTC_TIMEZONE)
+                        .withShiftTimezone(shiftTimeZone)
+                        .tumble(Duration.ofSeconds(3))
                         .withProcessingTime()
                         .aggregateAndBuild(
                                 getTimeWindowAggFunction(),
@@ -1060,7 +1061,7 @@ public class WindowOperatorTest {
         WindowOperator operator =
                 WindowOperatorBuilder.builder()
                         .withInputFields(inputFieldTypes)
-                        .session(Duration.ofSeconds(3), UTC_TIMEZONE)
+                        .session(Duration.ofSeconds(3))
                         .withEventTime(2)
                         .aggregateAndBuild(
                                 getTimeWindowAggFunction(),
@@ -1141,21 +1142,22 @@ public class WindowOperatorTest {
 
     @Test
     public void testProcessingTimeSessionWindowsInUTC() throws Throwable {
-        testProcessingTimeSessionWindows(UTC_TIMEZONE);
+        testProcessingTimeSessionWindows(UTC_TIMEZONE_ID);
     }
 
     @Test
     public void testProcessingTimeSessionWindowsInShanghai() throws Throwable {
-        testProcessingTimeSessionWindows(SHANGHAI_TIMEZONE);
+        testProcessingTimeSessionWindows(SHANGHAI_TIMEZONE_ID);
     }
 
-    private void testProcessingTimeSessionWindows(TimeZone timeZoneOfWindow) throws Throwable {
+    private void testProcessingTimeSessionWindows(String shiftTimeZone) throws Throwable {
         closeCalled.set(0);
 
         WindowOperator operator =
                 WindowOperatorBuilder.builder()
                         .withInputFields(inputFieldTypes)
-                        .session(Duration.ofSeconds(3), timeZoneOfWindow)
+                        .withShiftTimezone(shiftTimeZone)
+                        .session(Duration.ofSeconds(3))
                         .withProcessingTime()
                         .aggregateAndBuild(
                                 getTimeWindowAggFunction(),
@@ -1226,7 +1228,7 @@ public class WindowOperatorTest {
         WindowOperator operator =
                 WindowOperatorBuilder.builder()
                         .withInputFields(inputFieldTypes)
-                        .assigner(new PointSessionWindowAssigner(3000, UTC_TIMEZONE))
+                        .assigner(new PointSessionWindowAssigner(3000))
                         .withEventTime(2)
                         .aggregateAndBuild(
                                 getTimeWindowAggFunction(),
@@ -1283,7 +1285,7 @@ public class WindowOperatorTest {
         WindowOperator operator =
                 WindowOperatorBuilder.builder()
                         .withInputFields(inputFieldTypes)
-                        .tumble(Duration.ofSeconds(2), UTC_TIMEZONE)
+                        .tumble(Duration.ofSeconds(2))
                         .withEventTime(2)
                         .withAllowedLateness(Duration.ofMillis(500))
                         .produceUpdates()
@@ -1343,7 +1345,7 @@ public class WindowOperatorTest {
         WindowOperator operator =
                 WindowOperatorBuilder.builder()
                         .withInputFields(inputFieldTypes)
-                        .tumble(Duration.ofMillis(windowSize), UTC_TIMEZONE)
+                        .tumble(Duration.ofMillis(windowSize))
                         .withEventTime(2)
                         .withAllowedLateness(Duration.ofMillis(lateness))
                         .produceUpdates()
@@ -1363,7 +1365,7 @@ public class WindowOperatorTest {
         ConcurrentLinkedQueue<Object> expected = new ConcurrentLinkedQueue<>();
 
         WindowAssigner<TimeWindow> windowAssigner =
-                TumblingWindowAssigner.of(Duration.ofMillis(windowSize), UTC_TIMEZONE);
+                TumblingWindowAssigner.of(Duration.ofMillis(windowSize));
         long timestamp = Long.MAX_VALUE - 1750;
         Collection<TimeWindow> windows =
                 windowAssigner.assignWindows(GenericRowData.of(fromString("key2"), 1), timestamp);
@@ -1408,7 +1410,7 @@ public class WindowOperatorTest {
         WindowOperator operator =
                 WindowOperatorBuilder.builder()
                         .withInputFields(inputFieldTypes)
-                        .tumble(Duration.ofSeconds(windowSize), UTC_TIMEZONE)
+                        .tumble(Duration.ofSeconds(windowSize))
                         .withEventTime(2)
                         .withAllowedLateness(Duration.ofMillis(lateness))
                         .produceUpdates()
@@ -1633,14 +1635,13 @@ public class WindowOperatorTest {
 
         private final long sessionTimeout;
 
-        private PointSessionWindowAssigner(long sessionTimeout, TimeZone timeZone) {
-            super(sessionTimeout, timeZone, true);
+        private PointSessionWindowAssigner(long sessionTimeout) {
+            super(sessionTimeout, true);
             this.sessionTimeout = sessionTimeout;
         }
 
-        private PointSessionWindowAssigner(
-                long sessionTimeout, TimeZone timeZone, boolean isEventTime) {
-            super(sessionTimeout, timeZone, isEventTime);
+        private PointSessionWindowAssigner(long sessionTimeout, boolean isEventTime) {
+            super(sessionTimeout, isEventTime);
             this.sessionTimeout = sessionTimeout;
         }
 
@@ -1651,18 +1652,17 @@ public class WindowOperatorTest {
             if (second == 33) {
                 return Collections.singletonList(new TimeWindow(timestamp, timestamp));
             }
-            return Collections.singletonList(
-                    new TimeWindow(timestamp, windowPlus(timestamp, sessionTimeout, timeZone)));
+            return Collections.singletonList(new TimeWindow(timestamp, timestamp + sessionTimeout));
         }
 
         @Override
         public SessionWindowAssigner withEventTime() {
-            return new PointSessionWindowAssigner(sessionTimeout, timeZone, true);
+            return new PointSessionWindowAssigner(sessionTimeout, true);
         }
 
         @Override
         public SessionWindowAssigner withProcessingTime() {
-            return new PointSessionWindowAssigner(sessionTimeout, timeZone, false);
+            return new PointSessionWindowAssigner(sessionTimeout, false);
         }
     }
 

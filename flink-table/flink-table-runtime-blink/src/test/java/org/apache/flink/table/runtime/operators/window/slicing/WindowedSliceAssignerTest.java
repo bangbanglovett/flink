@@ -27,7 +27,6 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.TimeZone;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -36,12 +35,11 @@ import static org.junit.Assert.assertTrue;
 @RunWith(Parameterized.class)
 public class WindowedSliceAssignerTest extends SliceAssignerTestBase {
 
-    @Parameterized.Parameter public TimeZone timeZone;
+    @Parameterized.Parameter public String shiftTimeZone;
 
     @Parameterized.Parameters(name = "timezone = {0}")
-    public static Collection<TimeZone> parameters() {
-        return Arrays.asList(
-                TimeZone.getTimeZone("America/Los_Angeles"), TimeZone.getTimeZone("Asia/Shanghai"));
+    public static Collection<String> parameters() {
+        return Arrays.asList("America/Los_Angeles", "Asia/Shanghai");
     }
 
     private SliceAssigner tumbleAssigner;
@@ -50,11 +48,12 @@ public class WindowedSliceAssignerTest extends SliceAssignerTestBase {
 
     @Before
     public void setUp() {
-        this.tumbleAssigner = SliceAssigners.tumbling(-1, timeZone, Duration.ofHours(4));
+        this.tumbleAssigner = SliceAssigners.tumbling(-1, shiftTimeZone, Duration.ofHours(4));
         this.hopAssigner =
-                SliceAssigners.hopping(0, timeZone, Duration.ofHours(5), Duration.ofHours(1));
+                SliceAssigners.hopping(0, shiftTimeZone, Duration.ofHours(5), Duration.ofHours(1));
         this.cumulateAssigner =
-                SliceAssigners.cumulative(0, timeZone, Duration.ofHours(5), Duration.ofHours(1));
+                SliceAssigners.cumulative(
+                        0, shiftTimeZone, Duration.ofHours(5), Duration.ofHours(1));
     }
 
     @Test
@@ -62,14 +61,14 @@ public class WindowedSliceAssignerTest extends SliceAssignerTestBase {
         SliceAssigner assigner = SliceAssigners.windowed(0, tumbleAssigner);
 
         assertEquals(
-                epochMills("1970-01-01T00:00:00"),
-                assignSliceEnd(assigner, epochMills("1970-01-01T00:00:00")));
+                utcMills("1970-01-01T00:00:00"),
+                assignSliceEnd(assigner, utcMills("1970-01-01T00:00:00")));
         assertEquals(
-                epochMills("1970-01-01T05:00:00"),
-                assignSliceEnd(assigner, epochMills("1970-01-01T05:00:00")));
+                utcMills("1970-01-01T05:00:00"),
+                assignSliceEnd(assigner, utcMills("1970-01-01T05:00:00")));
         assertEquals(
-                epochMills("1970-01-01T10:00:00"),
-                assignSliceEnd(assigner, epochMills("1970-01-01T10:00:00")));
+                utcMills("1970-01-01T10:00:00"),
+                assignSliceEnd(assigner, utcMills("1970-01-01T10:00:00")));
     }
 
     @Test
@@ -77,14 +76,14 @@ public class WindowedSliceAssignerTest extends SliceAssignerTestBase {
         SliceAssigner assigner = SliceAssigners.windowed(0, tumbleAssigner);
 
         assertEquals(
-                epochMills("1969-12-31T20:00:00"),
-                assigner.getWindowStart(epochMills("1970-01-01T00:00:00")));
+                utcMills("1969-12-31T20:00:00"),
+                assigner.getWindowStart(utcMills("1970-01-01T00:00:00")));
         assertEquals(
-                epochMills("1970-01-01T00:00:00"),
-                assigner.getWindowStart(epochMills("1970-01-01T04:00:00")));
+                utcMills("1970-01-01T00:00:00"),
+                assigner.getWindowStart(utcMills("1970-01-01T04:00:00")));
         assertEquals(
-                epochMills("1970-01-01T04:00:00"),
-                assigner.getWindowStart(epochMills("1970-01-01T08:00:00")));
+                utcMills("1970-01-01T04:00:00"),
+                assigner.getWindowStart(utcMills("1970-01-01T08:00:00")));
     }
 
     @Test
@@ -92,29 +91,29 @@ public class WindowedSliceAssignerTest extends SliceAssignerTestBase {
         SliceAssigner assigner = SliceAssigners.windowed(0, hopAssigner);
 
         assertEquals(
-                epochMills("1969-12-31T19:00:00"),
-                assigner.getWindowStart(epochMills("1970-01-01T00:00:00")));
+                utcMills("1969-12-31T19:00:00"),
+                assigner.getWindowStart(utcMills("1970-01-01T00:00:00")));
         assertEquals(
-                epochMills("1969-12-31T20:00:00"),
-                assigner.getWindowStart(epochMills("1970-01-01T01:00:00")));
+                utcMills("1969-12-31T20:00:00"),
+                assigner.getWindowStart(utcMills("1970-01-01T01:00:00")));
         assertEquals(
-                epochMills("1969-12-31T21:00:00"),
-                assigner.getWindowStart(epochMills("1970-01-01T02:00:00")));
+                utcMills("1969-12-31T21:00:00"),
+                assigner.getWindowStart(utcMills("1970-01-01T02:00:00")));
         assertEquals(
-                epochMills("1969-12-31T22:00:00"),
-                assigner.getWindowStart(epochMills("1970-01-01T03:00:00")));
+                utcMills("1969-12-31T22:00:00"),
+                assigner.getWindowStart(utcMills("1970-01-01T03:00:00")));
         assertEquals(
-                epochMills("1969-12-31T23:00:00"),
-                assigner.getWindowStart(epochMills("1970-01-01T04:00:00")));
+                utcMills("1969-12-31T23:00:00"),
+                assigner.getWindowStart(utcMills("1970-01-01T04:00:00")));
         assertEquals(
-                epochMills("1970-01-01T00:00:00"),
-                assigner.getWindowStart(epochMills("1970-01-01T05:00:00")));
+                utcMills("1970-01-01T00:00:00"),
+                assigner.getWindowStart(utcMills("1970-01-01T05:00:00")));
         assertEquals(
-                epochMills("1970-01-01T01:00:00"),
-                assigner.getWindowStart(epochMills("1970-01-01T06:00:00")));
+                utcMills("1970-01-01T01:00:00"),
+                assigner.getWindowStart(utcMills("1970-01-01T06:00:00")));
         assertEquals(
-                epochMills("1970-01-01T05:00:00"),
-                assigner.getWindowStart(epochMills("1970-01-01T10:00:00")));
+                utcMills("1970-01-01T05:00:00"),
+                assigner.getWindowStart(utcMills("1970-01-01T10:00:00")));
     }
 
     @Test
@@ -122,29 +121,29 @@ public class WindowedSliceAssignerTest extends SliceAssignerTestBase {
         SliceAssigner assigner = SliceAssigners.windowed(0, cumulateAssigner);
 
         assertEquals(
-                epochMills("1969-12-31T19:00:00"),
-                assigner.getWindowStart(epochMills("1970-01-01T00:00:00")));
+                utcMills("1969-12-31T19:00:00"),
+                assigner.getWindowStart(utcMills("1970-01-01T00:00:00")));
         assertEquals(
-                epochMills("1970-01-01T00:00:00"),
-                assigner.getWindowStart(epochMills("1970-01-01T01:00:00")));
+                utcMills("1970-01-01T00:00:00"),
+                assigner.getWindowStart(utcMills("1970-01-01T01:00:00")));
         assertEquals(
-                epochMills("1970-01-01T00:00:00"),
-                assigner.getWindowStart(epochMills("1970-01-01T02:00:00")));
+                utcMills("1970-01-01T00:00:00"),
+                assigner.getWindowStart(utcMills("1970-01-01T02:00:00")));
         assertEquals(
-                epochMills("1970-01-01T00:00:00"),
-                assigner.getWindowStart(epochMills("1970-01-01T03:00:00")));
+                utcMills("1970-01-01T00:00:00"),
+                assigner.getWindowStart(utcMills("1970-01-01T03:00:00")));
         assertEquals(
-                epochMills("1970-01-01T00:00:00"),
-                assigner.getWindowStart(epochMills("1970-01-01T04:00:00")));
+                utcMills("1970-01-01T00:00:00"),
+                assigner.getWindowStart(utcMills("1970-01-01T04:00:00")));
         assertEquals(
-                epochMills("1970-01-01T00:00:00"),
-                assigner.getWindowStart(epochMills("1970-01-01T05:00:00")));
+                utcMills("1970-01-01T00:00:00"),
+                assigner.getWindowStart(utcMills("1970-01-01T05:00:00")));
         assertEquals(
-                epochMills("1970-01-01T05:00:00"),
-                assigner.getWindowStart(epochMills("1970-01-01T06:00:00")));
+                utcMills("1970-01-01T05:00:00"),
+                assigner.getWindowStart(utcMills("1970-01-01T06:00:00")));
         assertEquals(
-                epochMills("1970-01-01T05:00:00"),
-                assigner.getWindowStart(epochMills("1970-01-01T10:00:00")));
+                utcMills("1970-01-01T05:00:00"),
+                assigner.getWindowStart(utcMills("1970-01-01T10:00:00")));
     }
 
     @Test
@@ -152,14 +151,14 @@ public class WindowedSliceAssignerTest extends SliceAssignerTestBase {
         SliceAssigner assigner = SliceAssigners.windowed(0, tumbleAssigner);
 
         assertEquals(
-                Collections.singletonList(epochMills("1970-01-01T00:00:00")),
-                expiredSlices(assigner, epochMills("1970-01-01T00:00:00")));
+                Collections.singletonList(utcMills("1970-01-01T00:00:00")),
+                expiredSlices(assigner, utcMills("1970-01-01T00:00:00")));
         assertEquals(
-                Collections.singletonList(epochMills("1970-01-01T04:00:00")),
-                expiredSlices(assigner, epochMills("1970-01-01T04:00:00")));
+                Collections.singletonList(utcMills("1970-01-01T04:00:00")),
+                expiredSlices(assigner, utcMills("1970-01-01T04:00:00")));
         assertEquals(
-                Collections.singletonList(epochMills("1970-01-01T10:00:00")),
-                expiredSlices(assigner, epochMills("1970-01-01T10:00:00")));
+                Collections.singletonList(utcMills("1970-01-01T10:00:00")),
+                expiredSlices(assigner, utcMills("1970-01-01T10:00:00")));
     }
 
     @Test
@@ -178,8 +177,7 @@ public class WindowedSliceAssignerTest extends SliceAssignerTestBase {
         SliceAssigners.windowed(1, tumbleAssigner);
     }
 
-    /** Get epoch mills from a timestamp string and the parameterized time zone. */
-    private long epochMills(String timestampStr) {
-        return epochMills(timeZone, timestampStr);
+    private long localMills(String timestampStr) {
+        return localMills(timestampStr, shiftTimeZone);
     }
 }

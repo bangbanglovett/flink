@@ -29,10 +29,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
-import java.util.TimeZone;
 
-import static org.apache.flink.table.runtime.util.TimeWindowUtil.getWindowStartWithOffset;
-import static org.apache.flink.table.runtime.util.TimeWindowUtil.windowPlus;
+import static org.apache.flink.table.runtime.operators.window.TimeWindow.getWindowStartWithOffset;
 
 /**
  * A {@link WindowAssigner} that windows elements into cumulative windows based on the timestamp of
@@ -47,15 +45,11 @@ public class CumulativeWindowAssigner extends PanedWindowAssigner<TimeWindow>
 
     private final long step;
 
-    /** The TimeZone used to shift the window start and end with UTC+0 timeZone. */
-    private final TimeZone timeZone;
-
     private final long offset;
 
     private final boolean isEventTime;
 
-    protected CumulativeWindowAssigner(
-            long maxSize, long step, TimeZone timeZone, long offset, boolean isEventTime) {
+    protected CumulativeWindowAssigner(long maxSize, long step, long offset, boolean isEventTime) {
         if (maxSize <= 0 || step <= 0) {
             throw new IllegalArgumentException(
                     "CumulativeWindowAssigner parameters must satisfy step > 0 and size > 0");
@@ -67,7 +61,6 @@ public class CumulativeWindowAssigner extends PanedWindowAssigner<TimeWindow>
 
         this.maxSize = maxSize;
         this.step = step;
-        this.timeZone = timeZone;
         this.offset = offset;
         this.isEventTime = isEventTime;
     }
@@ -75,14 +68,10 @@ public class CumulativeWindowAssigner extends PanedWindowAssigner<TimeWindow>
     @Override
     public Collection<TimeWindow> assignWindows(RowData element, long timestamp) {
         List<TimeWindow> windows = new ArrayList<>();
-        long start = getWindowStartWithOffset(timestamp, offset, maxSize, timeZone);
-        long lastEnd = windowPlus(start, maxSize, timeZone);
-        long firstEnd =
-                windowPlus(
-                        getWindowStartWithOffset(timestamp, offset, step, timeZone),
-                        step,
-                        timeZone);
-        for (long end = firstEnd; end <= lastEnd; end = windowPlus(end, step, timeZone)) {
+        long start = getWindowStartWithOffset(timestamp, offset, maxSize);
+        long lastEnd = start + maxSize;
+        long firstEnd = getWindowStartWithOffset(timestamp, offset, step) + step;
+        for (long end = firstEnd; end <= lastEnd; end += step) {
             windows.add(new TimeWindow(start, end));
         }
         return windows;
@@ -90,8 +79,8 @@ public class CumulativeWindowAssigner extends PanedWindowAssigner<TimeWindow>
 
     @Override
     public TimeWindow assignPane(Object element, long timestamp) {
-        long start = getWindowStartWithOffset(timestamp, offset, step, timeZone);
-        return new TimeWindow(start, windowPlus(start, step, timeZone));
+        long start = getWindowStartWithOffset(timestamp, offset, step);
+        return new TimeWindow(start, start + step);
     }
 
     @Override
@@ -101,9 +90,9 @@ public class CumulativeWindowAssigner extends PanedWindowAssigner<TimeWindow>
 
     @Override
     public TimeWindow getLastWindow(TimeWindow pane) {
-        long windowStart = getWindowStartWithOffset(pane.getStart(), offset, maxSize, timeZone);
+        long windowStart = getWindowStartWithOffset(pane.getStart(), offset, maxSize);
         // the last window is the max size window
-        return new TimeWindow(windowStart, windowPlus(windowStart, maxSize, timeZone));
+        return new TimeWindow(windowStart, windowStart + maxSize);
     }
 
     @Override
@@ -164,25 +153,21 @@ public class CumulativeWindowAssigner extends PanedWindowAssigner<TimeWindow>
      *
      * @param maxSize The max size of the generated windows.
      * @param step The step interval for window size to increase of the generated windows.
-     * @param timeZoneOfWindow The timeZone used to shift the window start and end.
      * @return The time policy.
      */
-    public static CumulativeWindowAssigner of(
-            Duration maxSize, Duration step, TimeZone timeZoneOfWindow) {
-        return new CumulativeWindowAssigner(
-                maxSize.toMillis(), step.toMillis(), timeZoneOfWindow, 0, true);
+    public static CumulativeWindowAssigner of(Duration maxSize, Duration step) {
+        return new CumulativeWindowAssigner(maxSize.toMillis(), step.toMillis(), 0, true);
     }
 
     public CumulativeWindowAssigner withOffset(Duration offset) {
-        return new CumulativeWindowAssigner(
-                maxSize, step, timeZone, offset.toMillis(), isEventTime);
+        return new CumulativeWindowAssigner(maxSize, step, offset.toMillis(), isEventTime);
     }
 
     public CumulativeWindowAssigner withEventTime() {
-        return new CumulativeWindowAssigner(maxSize, step, timeZone, offset, true);
+        return new CumulativeWindowAssigner(maxSize, step, offset, true);
     }
 
     public CumulativeWindowAssigner withProcessingTime() {
-        return new CumulativeWindowAssigner(maxSize, step, timeZone, offset, false);
+        return new CumulativeWindowAssigner(maxSize, step, offset, false);
     }
 }

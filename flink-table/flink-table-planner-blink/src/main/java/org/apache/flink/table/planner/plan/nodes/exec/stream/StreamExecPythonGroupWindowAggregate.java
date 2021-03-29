@@ -63,7 +63,7 @@ import org.apache.flink.table.runtime.operators.window.triggers.EventTimeTrigger
 import org.apache.flink.table.runtime.operators.window.triggers.ProcessingTimeTriggers;
 import org.apache.flink.table.runtime.operators.window.triggers.Trigger;
 import org.apache.flink.table.runtime.typeutils.InternalTypeInfo;
-import org.apache.flink.table.types.logical.LogicalTypeRoot;
+import org.apache.flink.table.runtime.util.TimeWindowUtil;
 import org.apache.flink.table.types.logical.RowType;
 
 import org.apache.calcite.rel.core.AggregateCall;
@@ -74,7 +74,6 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.TimeZone;
 
 import static org.apache.flink.table.planner.plan.utils.AggregateUtil.hasRowIntervalType;
 import static org.apache.flink.table.planner.plan.utils.AggregateUtil.hasTimeIntervalType;
@@ -174,17 +173,12 @@ public class StreamExecPythonGroupWindowAggregate extends ExecNodeBase<RowData>
         } else {
             inputTimeFieldIndex = -1;
         }
-        // assign window based on the local time zone if time attribute type is TIMESTAMP_LTZ
-        final boolean needLocalTimeZone =
-                window.timeAttribute().getOutputDataType().getLogicalType().getTypeRoot()
-                        == LogicalTypeRoot.TIMESTAMP_WITH_LOCAL_TIME_ZONE;
-        final TimeZone timeZoneOfWindow =
-                needLocalTimeZone
-                        ? TimeZone.getTimeZone(tableConfig.getLocalTimeZone())
-                        : TimeZone.getTimeZone("UTC");
 
+        final String shiftTimeZone =
+                TimeWindowUtil.getShiftTimeZone(
+                        window.timeAttribute().getOutputDataType().getLogicalType(), tableConfig);
         Tuple2<WindowAssigner<?>, Trigger<?>> windowAssignerAndTrigger =
-                generateWindowAssignerAndTrigger(timeZoneOfWindow);
+                generateWindowAssignerAndTrigger();
         WindowAssigner<?> windowAssigner = windowAssignerAndTrigger.f0;
         Trigger<?> trigger = windowAssignerAndTrigger.f1;
         Configuration config = CommonPythonUtil.getMergedConfig(planner.getExecEnv(), tableConfig);
@@ -212,7 +206,8 @@ public class StreamExecPythonGroupWindowAggregate extends ExecNodeBase<RowData>
                             windowAssigner,
                             aggInfoList,
                             emitStrategy.getAllowLateness(),
-                            config);
+                            config,
+                            shiftTimeZone);
         } else {
             transform =
                     createPandasPythonStreamWindowGroupOneInputTransformation(
@@ -223,7 +218,8 @@ public class StreamExecPythonGroupWindowAggregate extends ExecNodeBase<RowData>
                             windowAssigner,
                             trigger,
                             emitStrategy.getAllowLateness(),
-                            config);
+                            config,
+                            shiftTimeZone);
         }
 
         if (CommonPythonUtil.isPythonWorkerUsingManagedMemory(config)) {
@@ -237,8 +233,7 @@ public class StreamExecPythonGroupWindowAggregate extends ExecNodeBase<RowData>
         return transform;
     }
 
-    private Tuple2<WindowAssigner<?>, Trigger<?>> generateWindowAssignerAndTrigger(
-            TimeZone timeZone) {
+    private Tuple2<WindowAssigner<?>, Trigger<?>> generateWindowAssignerAndTrigger() {
         WindowAssigner<?> windowAssiger;
         Trigger<?> trigger;
         if (window instanceof TumblingGroupWindow) {
@@ -246,12 +241,10 @@ public class StreamExecPythonGroupWindowAggregate extends ExecNodeBase<RowData>
             FieldReferenceExpression timeField = tumblingWindow.timeField();
             ValueLiteralExpression size = tumblingWindow.size();
             if (isProctimeAttribute(timeField) && hasTimeIntervalType(size)) {
-                windowAssiger =
-                        TumblingWindowAssigner.of(toDuration(size), timeZone).withProcessingTime();
+                windowAssiger = TumblingWindowAssigner.of(toDuration(size)).withProcessingTime();
                 trigger = ProcessingTimeTriggers.afterEndOfWindow();
             } else if (isRowtimeAttribute(timeField) && hasTimeIntervalType(size)) {
-                windowAssiger =
-                        TumblingWindowAssigner.of(toDuration(size), timeZone).withEventTime();
+                windowAssiger = TumblingWindowAssigner.of(toDuration(size)).withEventTime();
                 trigger = EventTimeTriggers.afterEndOfWindow();
             } else if (isProctimeAttribute(timeField) && hasRowIntervalType(size)) {
                 windowAssiger = CountTumblingWindowAssigner.of(toLong(size));
@@ -270,12 +263,11 @@ public class StreamExecPythonGroupWindowAggregate extends ExecNodeBase<RowData>
             ValueLiteralExpression slide = slidingWindow.slide();
             if (isProctimeAttribute(timeField) && hasTimeIntervalType(size)) {
                 windowAssiger =
-                        SlidingWindowAssigner.of(toDuration(size), toDuration(slide), timeZone)
+                        SlidingWindowAssigner.of(toDuration(size), toDuration(slide))
                                 .withProcessingTime();
                 trigger = ProcessingTimeTriggers.afterEndOfWindow();
             } else if (isRowtimeAttribute(timeField) && hasTimeIntervalType(size)) {
-                windowAssiger =
-                        SlidingWindowAssigner.of(toDuration(size), toDuration(slide), timeZone);
+                windowAssiger = SlidingWindowAssigner.of(toDuration(size), toDuration(slide));
                 trigger = EventTimeTriggers.afterEndOfWindow();
             } else if (isProctimeAttribute(timeField) && hasRowIntervalType(size)) {
                 windowAssiger = CountSlidingWindowAssigner.of(toLong(size), toLong(slide));
@@ -292,10 +284,10 @@ public class StreamExecPythonGroupWindowAggregate extends ExecNodeBase<RowData>
             FieldReferenceExpression timeField = sessionWindow.timeField();
             ValueLiteralExpression gap = sessionWindow.gap();
             if (isProctimeAttribute(timeField)) {
-                windowAssiger = SessionWindowAssigner.withGap(toDuration(gap), timeZone);
+                windowAssiger = SessionWindowAssigner.withGap(toDuration(gap));
                 trigger = ProcessingTimeTriggers.afterEndOfWindow();
             } else if (isRowtimeAttribute(timeField)) {
-                windowAssiger = SessionWindowAssigner.withGap(toDuration(gap), timeZone);
+                windowAssiger = SessionWindowAssigner.withGap(toDuration(gap));
                 trigger = EventTimeTriggers.afterEndOfWindow();
             } else {
                 throw new UnsupportedOperationException("This should not happen.");
@@ -315,7 +307,8 @@ public class StreamExecPythonGroupWindowAggregate extends ExecNodeBase<RowData>
                     WindowAssigner<?> windowAssigner,
                     Trigger<?> trigger,
                     long allowance,
-                    Configuration config) {
+                    Configuration config,
+                    String shiftTimeZone) {
 
         Tuple2<int[], PythonFunctionInfo[]> aggInfos =
                 CommonPythonUtil.extractPythonAggregateFunctionInfosFromAggregateCall(aggCalls);
@@ -331,7 +324,8 @@ public class StreamExecPythonGroupWindowAggregate extends ExecNodeBase<RowData>
                         allowance,
                         inputTimeFieldIndex,
                         pythonUdafInputOffsets,
-                        pythonFunctionInfos);
+                        pythonFunctionInfos,
+                        shiftTimeZone);
         return new OneInputTransformation<>(
                 inputTransform,
                 getDescription(),
@@ -349,7 +343,8 @@ public class StreamExecPythonGroupWindowAggregate extends ExecNodeBase<RowData>
                     WindowAssigner<?> windowAssigner,
                     AggregateInfoList aggInfoList,
                     long allowance,
-                    Configuration config) {
+                    Configuration config,
+                    String shiftTimeZone) {
         final int inputCountIndex = aggInfoList.getIndexOfCountStar();
         final boolean countStarInserted = aggInfoList.countStarInserted();
         final Tuple2<PythonAggregateFunctionInfo[], DataViewUtils.DataViewSpec[][]>
@@ -369,7 +364,8 @@ public class StreamExecPythonGroupWindowAggregate extends ExecNodeBase<RowData>
                         inputCountIndex,
                         generateUpdateBefore,
                         countStarInserted,
-                        allowance);
+                        allowance,
+                        shiftTimeZone);
 
         return new OneInputTransformation<>(
                 inputTransform,
@@ -390,7 +386,8 @@ public class StreamExecPythonGroupWindowAggregate extends ExecNodeBase<RowData>
                     long allowance,
                     int inputTimeFieldIndex,
                     int[] udafInputOffsets,
-                    PythonFunctionInfo[] pythonFunctionInfos) {
+                    PythonFunctionInfo[] pythonFunctionInfos,
+                    String shiftTimeZone) {
         Class clazz =
                 CommonPythonUtil.loadClass(
                         ARROW_STREAM_PYTHON_GROUP_WINDOW_AGGREGATE_FUNCTION_OPERATOR_NAME);
@@ -407,7 +404,8 @@ public class StreamExecPythonGroupWindowAggregate extends ExecNodeBase<RowData>
                             long.class,
                             PlannerNamedWindowProperty[].class,
                             int[].class,
-                            int[].class);
+                            int[].class,
+                            String.class);
             return ctor.newInstance(
                     config,
                     pythonFunctionInfos,
@@ -419,7 +417,8 @@ public class StreamExecPythonGroupWindowAggregate extends ExecNodeBase<RowData>
                     allowance,
                     namedWindowProperties,
                     grouping,
-                    udafInputOffsets);
+                    udafInputOffsets,
+                    shiftTimeZone);
         } catch (NoSuchMethodException
                 | IllegalAccessException
                 | InstantiationException
@@ -443,7 +442,8 @@ public class StreamExecPythonGroupWindowAggregate extends ExecNodeBase<RowData>
                     int indexOfCountStar,
                     boolean generateUpdateBefore,
                     boolean countStarInserted,
-                    long allowance) {
+                    long allowance,
+                    String shiftTimeZone) {
         Class clazz =
                 CommonPythonUtil.loadClass(
                         GENERAL_STREAM_PYTHON_GROUP_WINDOW_AGGREGATE_FUNCTION_OPERATOR_NAME);
@@ -463,7 +463,8 @@ public class StreamExecPythonGroupWindowAggregate extends ExecNodeBase<RowData>
                             WindowAssigner.class,
                             LogicalWindow.class,
                             long.class,
-                            PlannerNamedWindowProperty[].class);
+                            PlannerNamedWindowProperty[].class,
+                            String.class);
             return ctor.newInstance(
                     config,
                     inputType,
@@ -478,7 +479,8 @@ public class StreamExecPythonGroupWindowAggregate extends ExecNodeBase<RowData>
                     windowAssigner,
                     window,
                     allowance,
-                    namedWindowProperties);
+                    namedWindowProperties,
+                    shiftTimeZone);
         } catch (NoSuchMethodException
                 | IllegalAccessException
                 | InstantiationException

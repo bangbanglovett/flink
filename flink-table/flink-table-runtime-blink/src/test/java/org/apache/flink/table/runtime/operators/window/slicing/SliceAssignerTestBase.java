@@ -27,8 +27,8 @@ import org.apache.flink.shaded.guava18.com.google.common.collect.Lists;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
-import java.util.TimeZone;
 
 import static org.apache.flink.core.testutils.FlinkMatchers.containsMessage;
 import static org.junit.Assert.assertEquals;
@@ -92,29 +92,28 @@ public abstract class SliceAssignerTestBase {
     }
 
     protected static void assertSliceStartEnd(
-            String start,
-            String end,
-            long epochMills,
-            SliceAssigner assigner,
-            TimeZone timeZoneOfWindow) {
+            String start, String end, long epochMills, SliceAssigner assigner) {
 
         assertEquals(
                 start,
-                localTimestampStr(
-                        assigner.getWindowStart(assignSliceEnd(assigner, epochMills)),
-                        timeZoneOfWindow));
-        assertEquals(
-                end, localTimestampStr(assignSliceEnd(assigner, epochMills), timeZoneOfWindow));
+                localTimestampStr(assigner.getWindowStart(assignSliceEnd(assigner, epochMills))));
+        assertEquals(end, localTimestampStr(assignSliceEnd(assigner, epochMills)));
     }
 
-    public static String localTimestampStr(long epochMills, TimeZone timeZone) {
-        return LocalDateTime.ofInstant(Instant.ofEpochMilli(epochMills), timeZone.toZoneId())
+    public static String localTimestampStr(long epochMills) {
+        return LocalDateTime.ofInstant(Instant.ofEpochMilli(epochMills), ZoneId.of("UTC"))
                 .toString();
     }
 
-    /** Get epoch mills from a timestamp string and the time zone the timestamp belonged to. */
-    public static long epochMills(TimeZone timeZone, String timestampStr) {
+    /** Get utc mills from a timestamp string and the parameterized time zone. */
+    protected long utcMills(String timestampStr) {
         LocalDateTime localDateTime = LocalDateTime.parse(timestampStr);
-        return localDateTime.atZone(timeZone.toZoneId()).toInstant().toEpochMilli();
+        return localDateTime.atZone(ZoneId.of("UTC")).toInstant().toEpochMilli();
+    }
+
+    /** Get local mills from a timestamp string and the parameterized time zone. */
+    protected long localMills(String timestampStr, String shiftTimeZone) {
+        LocalDateTime localDateTime = LocalDateTime.parse(timestampStr);
+        return localDateTime.atZone(ZoneId.of(shiftTimeZone)).toInstant().toEpochMilli();
     }
 }

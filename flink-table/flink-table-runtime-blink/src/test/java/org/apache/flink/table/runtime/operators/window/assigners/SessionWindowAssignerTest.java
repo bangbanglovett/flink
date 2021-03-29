@@ -24,15 +24,12 @@ import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.runtime.operators.window.TimeWindow;
 
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
 import org.mockito.ArgumentMatcher;
 import org.mockito.Matchers;
 
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.TimeZone;
 import java.util.TreeSet;
 
 import static org.apache.flink.table.runtime.operators.window.WindowTestUtils.timeWindow;
@@ -52,25 +49,16 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 /** Tests for {@link SessionWindowAssigner}. */
-@RunWith(Parameterized.class)
 public class SessionWindowAssignerTest {
 
     private static final RowData ELEMENT = GenericRowData.of("String");
-
-    @Parameterized.Parameter public TimeZone timeZone;
-
-    @Parameterized.Parameters(name = "timezone = {0}")
-    public static Collection<TimeZone> parameters() {
-        return Arrays.asList(
-                TimeZone.getTimeZone("America/Los_Angeles"), TimeZone.getTimeZone("Asia/Shanghai"));
-    }
 
     @Test
     public void testWindowAssignment() {
         final int sessionGap = 5000;
 
         SessionWindowAssigner assigner =
-                SessionWindowAssigner.withGap(Duration.ofMillis(sessionGap), timeZone);
+                SessionWindowAssigner.withGap(Duration.ofMillis(sessionGap));
 
         assertThat(assigner.assignWindows(ELEMENT, 0L), contains(timeWindow(0, sessionGap)));
         assertThat(
@@ -86,8 +74,7 @@ public class SessionWindowAssignerTest {
     public void testMergeEmptyWindow() {
         MergingWindowAssigner.MergeCallback callback =
                 mock(MergingWindowAssigner.MergeCallback.class);
-        SessionWindowAssigner assigner =
-                SessionWindowAssigner.withGap(Duration.ofMillis(5000), timeZone);
+        SessionWindowAssigner assigner = SessionWindowAssigner.withGap(Duration.ofMillis(5000));
 
         assigner.mergeWindows(TimeWindow.of(0, 1), new TreeSet<>(), callback);
 
@@ -99,8 +86,7 @@ public class SessionWindowAssignerTest {
     public void testMergeSingleWindow() {
         MergingWindowAssigner.MergeCallback callback =
                 mock(MergingWindowAssigner.MergeCallback.class);
-        SessionWindowAssigner assigner =
-                SessionWindowAssigner.withGap(Duration.ofMillis(5000), timeZone);
+        SessionWindowAssigner assigner = SessionWindowAssigner.withGap(Duration.ofMillis(5000));
 
         TreeSet<TimeWindow> sortedWindows = new TreeSet<>();
         sortedWindows.add(TimeWindow.of(6000, 6001));
@@ -114,8 +100,7 @@ public class SessionWindowAssignerTest {
     public void testMergeConsecutiveWindows() {
         MergingWindowAssigner.MergeCallback callback =
                 mock(MergingWindowAssigner.MergeCallback.class);
-        SessionWindowAssigner assigner =
-                SessionWindowAssigner.withGap(Duration.ofMillis(5000), timeZone);
+        SessionWindowAssigner assigner = SessionWindowAssigner.withGap(Duration.ofMillis(5000));
 
         TreeSet<TimeWindow> sortedWindows = new TreeSet<>();
         sortedWindows.addAll(
@@ -144,8 +129,7 @@ public class SessionWindowAssignerTest {
     public void testMergeCoveringWindow() {
         MergingWindowAssigner.MergeCallback callback =
                 mock(MergingWindowAssigner.MergeCallback.class);
-        SessionWindowAssigner assigner =
-                SessionWindowAssigner.withGap(Duration.ofMillis(5000), timeZone);
+        SessionWindowAssigner assigner = SessionWindowAssigner.withGap(Duration.ofMillis(5000));
 
         TreeSet<TimeWindow> sortedWindows = new TreeSet<>();
         sortedWindows.addAll(
@@ -167,8 +151,7 @@ public class SessionWindowAssignerTest {
 
     @Test
     public void testProperties() {
-        SessionWindowAssigner assigner =
-                SessionWindowAssigner.withGap(Duration.ofMillis(5000), timeZone);
+        SessionWindowAssigner assigner = SessionWindowAssigner.withGap(Duration.ofMillis(5000));
 
         assertTrue(assigner.isEventTime());
         assertEquals(

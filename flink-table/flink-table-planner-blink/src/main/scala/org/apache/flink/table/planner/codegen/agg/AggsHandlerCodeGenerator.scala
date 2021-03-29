@@ -70,6 +70,7 @@ class AggsHandlerCodeGenerator(
   private var windowProperties: Seq[PlannerWindowProperty] = Seq()
   private var hasNamespace: Boolean = false
   private var sliceAssignerTerm: String = _
+  private var shiftTimeZone: String = _
 
   /** Aggregates informations */
   private var accTypeInfo: RowType = _
@@ -194,10 +195,12 @@ class AggsHandlerCodeGenerator(
     */
   private def initialWindowProperties(
       windowProperties: Seq[PlannerWindowProperty],
-      windowClass: Class[_]): Unit = {
+      windowClass: Class[_],
+      shiftTimeZone: String): Unit = {
     this.windowProperties = windowProperties
     this.namespaceClassName = windowClass.getCanonicalName
     this.hasNamespace = true
+    this.shiftTimeZone = shiftTimeZone
   }
 
   /**
@@ -575,11 +578,17 @@ class AggsHandlerCodeGenerator(
       name: String,
       aggInfoList: AggregateInfoList,
       windowProperties: Seq[PlannerWindowProperty],
-      sliceAssigner: SliceAssigner): GeneratedNamespaceAggsHandleFunction[JLong] = {
+      sliceAssigner: SliceAssigner,
+      shiftTimeZone: String): GeneratedNamespaceAggsHandleFunction[JLong] = {
     this.sliceAssignerTerm = newName("sliceAssigner")
     ctx.addReusableObjectWithName(sliceAssigner, sliceAssignerTerm)
     // we use window end timestamp to indicate a window, see SliceAssigner
-    generateNamespaceAggsHandler(name, aggInfoList, windowProperties, classOf[JLong])
+    generateNamespaceAggsHandler(
+      name,
+      aggInfoList,
+      windowProperties,
+      classOf[JLong],
+      shiftTimeZone)
   }
 
   /**
@@ -590,9 +599,10 @@ class AggsHandlerCodeGenerator(
       name: String,
       aggInfoList: AggregateInfoList,
       windowProperties: Seq[PlannerWindowProperty],
-      windowClass: Class[N]): GeneratedNamespaceAggsHandleFunction[N] = {
+      windowClass: Class[N],
+      shiftTimeZone: String): GeneratedNamespaceAggsHandleFunction[N] = {
 
-    initialWindowProperties(windowProperties, windowClass)
+    initialWindowProperties(windowProperties, windowClass, shiftTimeZone)
     initialAggregateInformation(aggInfoList)
 
     // generates all methods body first to add necessary reuse code to context
@@ -694,9 +704,10 @@ class AggsHandlerCodeGenerator(
       name: String,
       aggInfoList: AggregateInfoList,
       windowProperties: Seq[PlannerWindowProperty],
-      windowClass: Class[N]): GeneratedNamespaceTableAggsHandleFunction[N] = {
+      windowClass: Class[N],
+      shiftedTimeZone: String): GeneratedNamespaceTableAggsHandleFunction[N] = {
 
-    initialWindowProperties(windowProperties, windowClass)
+    initialWindowProperties(windowProperties, windowClass, shiftedTimeZone)
     initialAggregateInformation(aggInfoList)
 
     // generates all methods body first to add necessary reuse code to context
@@ -1030,21 +1041,30 @@ class AggsHandlerCodeGenerator(
         case w: PlannerWindowStart =>
           // return a Timestamp(Internal is TimestampData)
           GeneratedExpression(
-            s"$TIMESTAMP_DATA.fromEpochMillis($sliceAssignerTerm.getWindowStart($NAMESPACE_TERM))",
+            s"""
+                |$TIMESTAMP_DATA.fromEpochMillis(
+                |${getShiftEpochMills(s"$sliceAssignerTerm.getWindowStart($NAMESPACE_TERM)")})
+                """.stripMargin,
             "false",
             "",
             w.getResultType)
         case w: PlannerWindowEnd =>
           // return a Timestamp(Internal is TimestampData)
           GeneratedExpression(
-            s"$TIMESTAMP_DATA.fromEpochMillis($NAMESPACE_TERM)",
+            s"""
+               |$TIMESTAMP_DATA.fromEpochMillis(
+               |${getShiftEpochMills(s"$NAMESPACE_TERM")})
+                """.stripMargin,
             "false",
             "",
             w.getResultType)
         case r: PlannerRowtimeAttribute =>
           // return a rowtime, use TimestampData as internal type
           GeneratedExpression(
-            s"$TIMESTAMP_DATA.fromEpochMillis($NAMESPACE_TERM - 1)",
+            s"""
+               |$TIMESTAMP_DATA.fromEpochMillis(
+               |${getShiftEpochMills(s"$NAMESPACE_TERM - 1")})
+                """.stripMargin,
             "false",
             "",
             r.getResultType)
@@ -1057,21 +1077,30 @@ class AggsHandlerCodeGenerator(
         case w: PlannerWindowStart =>
           // return a Timestamp(Internal is TimestampData)
           GeneratedExpression(
-            s"$TIMESTAMP_DATA.fromEpochMillis($NAMESPACE_TERM.getStart())",
+            s"""
+               |$TIMESTAMP_DATA.fromEpochMillis(
+               |${getShiftEpochMills(s"$NAMESPACE_TERM.getStart()")})
+                """.stripMargin,
             "false",
             "",
             w.getResultType)
         case w: PlannerWindowEnd =>
           // return a Timestamp(Internal is TimestampData)
           GeneratedExpression(
-            s"$TIMESTAMP_DATA.fromEpochMillis($NAMESPACE_TERM.getEnd())",
+            s"""
+               |$TIMESTAMP_DATA.fromEpochMillis(
+               |${getShiftEpochMills(s"$NAMESPACE_TERM.getEnd()")})
+                """.stripMargin,
             "false",
             "",
             w.getResultType)
         case r: PlannerRowtimeAttribute =>
           // return a rowtime, use TimestampData as internal type
           GeneratedExpression(
-            s"$TIMESTAMP_DATA.fromEpochMillis($NAMESPACE_TERM.getEnd() - 1)",
+            s"""
+               |$TIMESTAMP_DATA.fromEpochMillis(
+               |${getShiftEpochMills(s"$NAMESPACE_TERM.getEnd() - 1")})
+                """.stripMargin,
             "false",
             "",
             r.getResultType)
@@ -1080,6 +1109,17 @@ class AggsHandlerCodeGenerator(
           GeneratedExpression(s"$TIMESTAMP_DATA.fromEpochMillis(-1L)", "true", "", p.getResultType)
       }
     }
+  }
+
+  private def getShiftEpochMills(itemExpr: String): String = {
+     if ("UTC".equals(shiftTimeZone)) {
+       itemExpr
+     } else {
+       s"""
+          |$TIME_WINDOW_UTIL.toEpochMills(
+          |$itemExpr, java.util.TimeZone.getTimeZone("$shiftTimeZone"), false)
+          """.stripMargin
+     }
   }
 
   private def genGetValue(): String = {

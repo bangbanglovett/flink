@@ -145,7 +145,8 @@ import static org.apache.calcite.sql.SqlUtil.stripAs;
 import static org.apache.calcite.util.Static.RESOURCE;
 
 /**
- * Default implementation of {@link SqlValidator}.
+ * Default implementation of {@link SqlValidator}, the class was copied over because of
+ * CALCITE-4554.
  *
  * <p>Lines 4697 ~ 4716, Flink enables TIMESTAMP and TIMESTAMP_LTZ for system time period
  * specification type.

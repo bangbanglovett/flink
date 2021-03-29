@@ -25,10 +25,9 @@ import org.apache.flink.table.api._
 import org.apache.flink.table.api.bridge.scala._
 import org.apache.flink.table.data.{RowData, TimestampData}
 import org.apache.flink.table.planner.factories.TestValuesTableFactory
-import org.apache.flink.table.planner.runtime.stream.sql.WindowAggregateITCase
-import org.apache.flink.table.planner.runtime.utils.StreamingWithStateTestBase.StateBackendMode
+import org.apache.flink.table.planner.runtime.utils.StreamingWithStateTestBase.{HEAP_BACKEND, ROCKSDB_BACKEND, StateBackendMode}
 import org.apache.flink.table.planner.runtime.utils.TestData
-import org.apache.flink.table.runtime.util.RowDataHarnessAssertor
+import org.apache.flink.table.runtime.util.{RowDataHarnessAssertor, TimeWindowUtil}
 import org.apache.flink.table.runtime.util.StreamRecordUtils.binaryRecord
 import org.apache.flink.types.Row
 import org.apache.flink.types.RowKind.INSERT
@@ -38,6 +37,10 @@ import org.junit.runners.Parameterized
 import org.junit.{Before, Test}
 
 import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.{Collection => JCollection}
+import java.util.TimeZone
+
+import scala.collection.JavaConversions._
 
 /**
  * Harness tests for processing-time window aggregate. We can't test them in
@@ -45,13 +48,14 @@ import java.util.concurrent.ConcurrentLinkedQueue
  * we use harness to test them.
  */
 @RunWith(classOf[Parameterized])
-class WindowAggregateHarnessTest(backend: StateBackendMode)
+class WindowAggregateHarnessTest(backend: StateBackendMode, timeZone: TimeZone)
   extends HarnessTestBase(backend) {
 
   @Before
   override def before(): Unit = {
     super.before()
     val dataId = TestValuesTableFactory.registerData(TestData.windowData)
+    tEnv.getConfig.setLocalTimeZone(timeZone.toZoneId)
     tEnv.executeSql(
       s"""
          |CREATE TABLE T1 (
@@ -273,5 +277,17 @@ class WindowAggregateHarnessTest(backend: StateBackendMode)
   
   private def timestamp(ms: Long): TimestampData = {
     TimestampData.fromEpochMillis(ms)
+  }
+}
+
+object WindowAggregateHarnessTest {
+
+  @Parameterized.Parameters(name = "StateBackend={0}, TimeZone={1}")
+  def parameters(): JCollection[Array[java.lang.Object]] = {
+    Seq[Array[AnyRef]](
+      Array(HEAP_BACKEND, TimeZone.getTimeZone("UTC")),
+      Array(HEAP_BACKEND, TimeZone.getTimeZone("Asia/Shanghai")),
+      Array(ROCKSDB_BACKEND, TimeZone.getTimeZone("UTC")),
+      Array(ROCKSDB_BACKEND, TimeZone.getTimeZone("Asia/Shanghai")))
   }
 }

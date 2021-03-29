@@ -42,7 +42,6 @@ import org.apache.flink.table.runtime.operators.window.triggers.Trigger;
 import org.apache.flink.table.types.logical.LogicalType;
 
 import java.time.Duration;
-import java.util.TimeZone;
 
 import static org.apache.flink.util.Preconditions.checkArgument;
 import static org.apache.flink.util.Preconditions.checkNotNull;
@@ -73,6 +72,7 @@ public class WindowOperatorBuilder {
     protected long allowedLateness = 0L;
     protected boolean produceUpdates = false;
     protected int rowtimeIndex = -1;
+    protected String shiftTimeZone = "UTC";
 
     public static WindowOperatorBuilder builder() {
         return new WindowOperatorBuilder();
@@ -83,27 +83,37 @@ public class WindowOperatorBuilder {
         return this;
     }
 
-    public WindowOperatorBuilder tumble(Duration size, TimeZone timeZone) {
-        checkArgument(windowAssigner == null);
-        this.windowAssigner = TumblingWindowAssigner.of(size, timeZone);
+    /**
+     * The shift timezone of the window, if the proctime or rowtime type is TIMESTAMP_LTZ, the shift
+     * timezone is the timezone user configured in TableConfig, other cases the timezone is UTC
+     * which means never shift when assigning windows.
+     */
+    public WindowOperatorBuilder withShiftTimezone(String shiftTimeZone) {
+        this.shiftTimeZone = shiftTimeZone;
         return this;
     }
 
-    public WindowOperatorBuilder sliding(Duration size, Duration slide, TimeZone timeZone) {
+    public WindowOperatorBuilder tumble(Duration size) {
         checkArgument(windowAssigner == null);
-        this.windowAssigner = SlidingWindowAssigner.of(size, slide, timeZone);
+        this.windowAssigner = TumblingWindowAssigner.of(size);
         return this;
     }
 
-    public WindowOperatorBuilder cumulative(Duration size, Duration step, TimeZone timeZone) {
+    public WindowOperatorBuilder sliding(Duration size, Duration slide) {
         checkArgument(windowAssigner == null);
-        this.windowAssigner = CumulativeWindowAssigner.of(size, step, timeZone);
+        this.windowAssigner = SlidingWindowAssigner.of(size, slide);
         return this;
     }
 
-    public WindowOperatorBuilder session(Duration sessionGap, TimeZone timeZone) {
+    public WindowOperatorBuilder cumulative(Duration size, Duration step) {
         checkArgument(windowAssigner == null);
-        this.windowAssigner = SessionWindowAssigner.withGap(sessionGap, timeZone);
+        this.windowAssigner = CumulativeWindowAssigner.of(size, step);
+        return this;
+    }
+
+    public WindowOperatorBuilder session(Duration sessionGap) {
+        checkArgument(windowAssigner == null);
+        this.windowAssigner = SessionWindowAssigner.withGap(sessionGap);
         return this;
     }
 
@@ -279,7 +289,8 @@ public class WindowOperatorBuilder {
                         windowOperatorBuilder.windowPropertyTypes,
                         windowOperatorBuilder.rowtimeIndex,
                         windowOperatorBuilder.produceUpdates,
-                        windowOperatorBuilder.allowedLateness);
+                        windowOperatorBuilder.allowedLateness,
+                        windowOperatorBuilder.shiftTimeZone);
             } else {
                 //noinspection unchecked
                 return new TableAggregateWindowOperator(
@@ -294,7 +305,8 @@ public class WindowOperatorBuilder {
                         windowOperatorBuilder.windowPropertyTypes,
                         windowOperatorBuilder.rowtimeIndex,
                         windowOperatorBuilder.produceUpdates,
-                        windowOperatorBuilder.allowedLateness);
+                        windowOperatorBuilder.allowedLateness,
+                        windowOperatorBuilder.shiftTimeZone);
             }
         }
     }
@@ -342,7 +354,8 @@ public class WindowOperatorBuilder {
                         windowOperatorBuilder.windowPropertyTypes,
                         windowOperatorBuilder.rowtimeIndex,
                         windowOperatorBuilder.produceUpdates,
-                        windowOperatorBuilder.allowedLateness);
+                        windowOperatorBuilder.allowedLateness,
+                        windowOperatorBuilder.shiftTimeZone);
             } else {
                 //noinspection unchecked
                 return new AggregateWindowOperator(
@@ -358,7 +371,8 @@ public class WindowOperatorBuilder {
                         windowOperatorBuilder.windowPropertyTypes,
                         windowOperatorBuilder.rowtimeIndex,
                         windowOperatorBuilder.produceUpdates,
-                        windowOperatorBuilder.allowedLateness);
+                        windowOperatorBuilder.allowedLateness,
+                        windowOperatorBuilder.shiftTimeZone);
             }
         }
     }

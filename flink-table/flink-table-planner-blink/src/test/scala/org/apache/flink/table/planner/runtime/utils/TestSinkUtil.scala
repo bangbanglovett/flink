@@ -29,6 +29,7 @@ import org.apache.flink.table.utils.EncodingUtils
 import org.apache.flink.types.Row
 import org.apache.calcite.avatica.util.DateTimeUtils
 import java.sql.{Date, Time, Timestamp}
+import java.time.{Instant, LocalDateTime}
 import java.util.{Calendar, TimeZone}
 
 import org.apache.flink.util.StringUtils

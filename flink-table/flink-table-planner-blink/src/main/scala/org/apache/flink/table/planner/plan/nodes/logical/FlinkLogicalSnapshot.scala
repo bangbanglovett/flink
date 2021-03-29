@@ -18,7 +18,6 @@
 package org.apache.flink.table.planner.plan.nodes.logical
 
 import org.apache.flink.table.planner.plan.nodes.FlinkConventions
-
 import org.apache.calcite.plan._
 import org.apache.calcite.rel.convert.ConverterRule
 import org.apache.calcite.rel.core.Snapshot
@@ -27,9 +26,11 @@ import org.apache.calcite.rel.metadata.{RelMdCollation, RelMetadataQuery}
 import org.apache.calcite.rel.{RelCollation, RelCollationTraitDef, RelNode}
 import org.apache.calcite.rex.{RexFieldAccess, RexLiteral, RexNode}
 import org.apache.calcite.util.Litmus
-
 import java.util
 import java.util.function.Supplier
+
+import org.apache.calcite.rel.`type`.RelDataType
+import org.apache.calcite.sql.`type`.{SqlTypeFamily, SqlTypeName}
 
 /**
   * Sub-class of [[Snapshot]] that is a relational expression which returns
@@ -59,7 +60,13 @@ class FlinkLogicalSnapshot(
       case _ =>
         return litmus.fail(String.format(msg, s"an expression call '${period.toString}'"))
     }
-    super.isValid(litmus, context)
+    val dataType = period.getType
+
+    if (dataType.getSqlTypeName.getFamily != SqlTypeFamily.TIMESTAMP) {
+      litmus.fail("The system time period specification expects" +
+        " Timestamp type but is '" + dataType.getSqlTypeName + "'")
+    }
+    litmus.succeed()
   }
 
   override def copy(

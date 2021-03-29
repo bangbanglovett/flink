@@ -79,9 +79,9 @@ public final class FlinkRexBuilder extends RexBuilder {
      *   <li>The empty string for string types (CHAR, BINARY, VARCHAR, VARBINARY).
      * </ul>
      *
-     * <p>Uses '19-70-01-01 00:00:00'(epoch 0 second) as zero value for TIMESTAMP_LTZ, the zero
-     * value '0000-00-00 00:00:00' in Calcite is an invalid time whose month and day is invalid, we
-     * workaround here. Stop override once Calcite fix this issue.
+     * <p>Uses '1970-01-01 00:00:00'(epoch 0 second) as zero value for TIMESTAMP_LTZ, the zero value
+     * '0000-00-00 00:00:00' in Calcite is an invalid time whose month and day is invalid, we
+     * workaround here. Stop override once CALCITE-4555 fixed.
      *
      * @param type Type
      * @return Simple literal, or cast simple literal

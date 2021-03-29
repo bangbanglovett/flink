@@ -826,7 +826,7 @@ public class FieldInfoUtils {
                     .bridgedTo(java.time.Instant.class);
         } else {
             return new AtomicDataType(new TimestampType(true, kind, 3))
-                    .bridgedTo(java.sql.Timestamp.class);
+                    .bridgedTo(java.time.LocalDateTime.class);
         }
     }
 

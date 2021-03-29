@@ -26,10 +26,8 @@ import org.apache.flink.table.runtime.operators.window.TimeWindow;
 import java.time.Duration;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.TimeZone;
 
-import static org.apache.flink.table.runtime.util.TimeWindowUtil.getWindowStartWithOffset;
-import static org.apache.flink.table.runtime.util.TimeWindowUtil.windowPlus;
+import static org.apache.flink.table.runtime.operators.window.TimeWindow.getWindowStartWithOffset;
 
 /**
  * A {@link WindowAssigner} that windows elements into fixed-size windows based on the timestamp of
@@ -42,16 +40,12 @@ public class TumblingWindowAssigner extends WindowAssigner<TimeWindow>
     /** Size of this window. */
     private final long size;
 
-    /** The TimeZone used to shift the window start and end with UTC+0 timeZone. */
-    private final TimeZone timeZone;
-
     /** Offset of this window. Windows start at time N * size + offset, where 0 is the epoch. */
     private final long offset;
 
     private final boolean isEventTime;
 
-    protected TumblingWindowAssigner(
-            long size, TimeZone timeZone, long offset, boolean isEventTime) {
+    protected TumblingWindowAssigner(long size, long offset, boolean isEventTime) {
         if (size <= 0) {
             throw new IllegalArgumentException(
                     "TumblingWindowAssigner parameters must satisfy size > 0");
@@ -59,13 +53,12 @@ public class TumblingWindowAssigner extends WindowAssigner<TimeWindow>
         this.size = size;
         this.offset = offset;
         this.isEventTime = isEventTime;
-        this.timeZone = timeZone;
     }
 
     @Override
     public Collection<TimeWindow> assignWindows(RowData element, long timestamp) {
-        long start = getWindowStartWithOffset(timestamp, offset, size, timeZone);
-        return Collections.singletonList(new TimeWindow(start, windowPlus(start, size, timeZone)));
+        long start = getWindowStartWithOffset(timestamp, offset, size);
+        return Collections.singletonList(new TimeWindow(start, start + size));
     }
 
     @Override
@@ -92,11 +85,10 @@ public class TumblingWindowAssigner extends WindowAssigner<TimeWindow>
      * time windows based on the element timestamp.
      *
      * @param size The size of the generated windows.
-     * @param timeZoneOfWindow The timeZone used to shift the window start and end.
      * @return The time policy.
      */
-    public static TumblingWindowAssigner of(Duration size, TimeZone timeZoneOfWindow) {
-        return new TumblingWindowAssigner(size.toMillis(), timeZoneOfWindow, 0, true);
+    public static TumblingWindowAssigner of(Duration size) {
+        return new TumblingWindowAssigner(size.toMillis(), 0, true);
     }
 
     /**
@@ -117,14 +109,14 @@ public class TumblingWindowAssigner extends WindowAssigner<TimeWindow>
      * @return The time policy.
      */
     public TumblingWindowAssigner withOffset(Duration offset) {
-        return new TumblingWindowAssigner(size, timeZone, offset.toMillis(), isEventTime);
+        return new TumblingWindowAssigner(size, offset.toMillis(), isEventTime);
     }
 
     public TumblingWindowAssigner withEventTime() {
-        return new TumblingWindowAssigner(size, timeZone, offset, true);
+        return new TumblingWindowAssigner(size, offset, true);
     }
 
     public TumblingWindowAssigner withProcessingTime() {
-        return new TumblingWindowAssigner(size, timeZone, offset, false);
+        return new TumblingWindowAssigner(size, offset, false);
     }
 }

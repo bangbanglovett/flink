@@ -36,7 +36,10 @@ class TimeIndicatorRelDataTypeTest {
       typeFactory.createProctimeIndicatorType(false).getFullTypeString)
     assertEquals(
       "TIME ATTRIBUTE(ROWTIME) NOT NULL",
-      typeFactory.createRowtimeIndicatorType(false).getFullTypeString)
+      typeFactory.createRowtimeIndicatorType(false, false).getFullTypeString)
+    assertEquals(
+      "TIME ATTRIBUTE(ROWTIME) NOT NULL",
+      typeFactory.createRowtimeIndicatorType(false, true).getFullTypeString)
   }
 
 }

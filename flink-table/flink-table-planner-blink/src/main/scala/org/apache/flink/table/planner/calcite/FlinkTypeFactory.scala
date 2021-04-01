@@ -154,7 +154,7 @@ class FlinkTypeFactory(typeSystem: RelDataTypeSystem)
       case LogicalTypeRoot.TIMESTAMP_WITHOUT_TIME_ZONE =>
         val timestampType = t.asInstanceOf[TimestampType]
         timestampType.getKind match {
-          case TimestampKind.ROWTIME => createRowtimeIndicatorType(true)
+          case TimestampKind.ROWTIME => createRowtimeIndicatorType(true, false)
           case TimestampKind.REGULAR => createSqlType(TIMESTAMP, timestampType.getPrecision)
           case TimestampKind.PROCTIME => throw new TableException(
             s"Processing time indicator only supports" +
@@ -165,6 +165,7 @@ class FlinkTypeFactory(typeSystem: RelDataTypeSystem)
         val lzTs = t.asInstanceOf[LocalZonedTimestampType]
         lzTs.getKind match {
           case TimestampKind.PROCTIME => createProctimeIndicatorType(true)
+          case TimestampKind.ROWTIME => createRowtimeIndicatorType(true, true)
           case TimestampKind.REGULAR =>
             createSqlType(TIMESTAMP_WITH_LOCAL_TIME_ZONE, lzTs.getPrecision)
         }
@@ -196,8 +197,12 @@ class FlinkTypeFactory(typeSystem: RelDataTypeSystem)
   /**
     * Creates a indicator type for event-time, but with similar properties as SQL timestamp.
     */
-  def createRowtimeIndicatorType(isNullable: Boolean): RelDataType = {
-    val originalType = createFieldTypeFromLogicalType(new TimestampType(isNullable, 3))
+  def createRowtimeIndicatorType(isNullable: Boolean, isTimestampLtz: Boolean): RelDataType = {
+    val originalType = if (isTimestampLtz) {
+      createFieldTypeFromLogicalType(new LocalZonedTimestampType(isNullable, 3))
+    } else {
+      createFieldTypeFromLogicalType(new TimestampType(isNullable, 3))
+    }
     canonize(new TimeIndicatorRelDataType(
       getTypeSystem,
       originalType.asInstanceOf[BasicSqlType],
@@ -546,9 +551,7 @@ object FlinkTypeFactory {
       case TIMESTAMP_WITH_LOCAL_TIME_ZONE if relDataType.isInstanceOf[TimeIndicatorRelDataType] =>
         val indicator = relDataType.asInstanceOf[TimeIndicatorRelDataType]
         if (indicator.isEventTime) {
-          throw new TableException(s"Event time indicator only supports" +
-            s" TimestampType now, but actual is LocalZonedTimestampType." +
-            s" This is a bug in planner, please file an issue.")
+          new TimestampType(true, TimestampKind.PROCTIME, 3)
         } else {
           new LocalZonedTimestampType(true, TimestampKind.PROCTIME, 3)
         }

@@ -25,12 +25,10 @@ import org.apache.flink.table.planner.factories.TestValuesTableFactory
 import org.apache.flink.table.planner.runtime.utils.JavaUserDefinedScalarFunctions.JavaFunc5
 import org.apache.flink.table.planner.runtime.utils.{StreamingTestBase, TestingAppendSink}
 import org.apache.flink.types.Row
-
 import org.junit.Assert.{assertEquals, assertTrue}
 import org.junit.Test
-
 import java.sql.Timestamp
-import java.time.LocalDateTime
+import java.time.{Instant, LocalDateTime}
 import java.util.TimeZone
 
 /**
@@ -49,20 +47,32 @@ class TimeAttributeITCase extends StreamingTestBase {
 
   val dataId: String = TestValuesTableFactory.registerData(data)
 
+  val ltzData = List(
+    rowOf("1970-01-01 08:00:00.001", Instant.ofEpochSecond(1), 1, 1d),
+    rowOf("1970-01-01 08:00:00.002", Instant.ofEpochSecond(2L), 1, 2d),
+    rowOf("1970-01-01 08:00:00.003", Instant.ofEpochSecond(3L), 1, 2d),
+    rowOf("1970-01-01 08:00:00.004", Instant.ofEpochSecond(4L), 1, 5d),
+    rowOf("1970-01-01 08:00:00.007", Instant.ofEpochSecond(7L), 1, 3d),
+    rowOf("1970-01-01 08:00:00.008", Instant.ofEpochSecond(8L), 1, 3d),
+    rowOf("1970-01-01 08:00:00.016", Instant.ofEpochSecond(16L), 1, 4d))
+
+  val ltzDataId: String = TestValuesTableFactory.registerData(ltzData)
+
+
   @Test
   def testWindowAggregateOnWatermark(): Unit = {
     val ddl =
       s"""
-        |CREATE TABLE src (
-        |  log_ts STRING,
-        |  ts TIMESTAMP(3),
-        |  a INT,
-        |  b DOUBLE,
-        |  WATERMARK FOR ts AS ts - INTERVAL '0.001' SECOND
-        |) WITH (
-        |  'connector' = 'values',
-        |  'data-id' = '$dataId'
-        |)
+         |CREATE TABLE src (
+         |  log_ts STRING,
+         |  ts TIMESTAMP_LTZ(3),
+         |  a INT,
+         |  b DOUBLE,
+         |  WATERMARK FOR ts AS ts - INTERVAL '0.001' SECOND
+         |) WITH (
+         |  'connector' = 'values',
+         |  'data-id' = '$ltzDataId'
+         |)
       """.stripMargin
     val query =
       """

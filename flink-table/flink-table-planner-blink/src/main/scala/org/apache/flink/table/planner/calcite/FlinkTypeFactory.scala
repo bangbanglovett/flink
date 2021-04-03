@@ -154,7 +154,7 @@ class FlinkTypeFactory(typeSystem: RelDataTypeSystem)
       case LogicalTypeRoot.TIMESTAMP_WITHOUT_TIME_ZONE =>
         val timestampType = t.asInstanceOf[TimestampType]
         timestampType.getKind match {
-          case TimestampKind.ROWTIME => createRowtimeIndicatorType(true, false)
+          case TimestampKind.ROWTIME => createRowtimeIndicatorType(t.isNullable, false)
           case TimestampKind.REGULAR => createSqlType(TIMESTAMP, timestampType.getPrecision)
           case TimestampKind.PROCTIME => throw new TableException(
             s"Processing time indicator only supports" +
@@ -164,8 +164,8 @@ class FlinkTypeFactory(typeSystem: RelDataTypeSystem)
       case LogicalTypeRoot.TIMESTAMP_WITH_LOCAL_TIME_ZONE =>
         val lzTs = t.asInstanceOf[LocalZonedTimestampType]
         lzTs.getKind match {
-          case TimestampKind.PROCTIME => createProctimeIndicatorType(true)
-          case TimestampKind.ROWTIME => createRowtimeIndicatorType(true, true)
+          case TimestampKind.PROCTIME => createProctimeIndicatorType(t.isNullable)
+          case TimestampKind.ROWTIME => createRowtimeIndicatorType(t.isNullable, true)
           case TimestampKind.REGULAR =>
             createSqlType(TIMESTAMP_WITH_LOCAL_TIME_ZONE, lzTs.getPrecision)
         }

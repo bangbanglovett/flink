@@ -47,6 +47,9 @@ class TimeIndicatorRelDataType(
   }
 
   override def toString: String = {
+    // Calcite caches type instance by the type string representation in
+    // org.apache.calcite.rel.type.RelDataTypeFactoryImpl, thus we use
+    // unique name for each TimeIndicatorRelDataType
     s"${if (typeName == TIMESTAMP) "TIMESTAMP(3)" else "TIMESTAMP_LTZ(3)"}" +
       s" ${if (isEventTime) "*ROWTIME*" else "*PROCTIME*"}"
   }

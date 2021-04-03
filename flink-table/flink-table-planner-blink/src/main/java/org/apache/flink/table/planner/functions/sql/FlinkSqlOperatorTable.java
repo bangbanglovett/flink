@@ -76,8 +76,6 @@ public class FlinkSqlOperatorTable extends ReflectiveSqlOperatorTable {
             createTimeIndicatorReturnType(true, false);
     private static final SqlReturnTypeInference PROCTIME_TYPE_INFERENCE =
             createTimeIndicatorReturnType(false, true);
-    private static final SqlReturnTypeInference ROWTIME_LTZ_TYPE_INFERENCE =
-            createTimeIndicatorReturnType(true, true);
 
     private static SqlReturnTypeInference createTimeIndicatorReturnType(
             boolean isRowTime, boolean isTimestampLtz) {
@@ -121,7 +119,10 @@ public class FlinkSqlOperatorTable extends ReflectiveSqlOperatorTable {
                     SqlFunctionCategory.TIMEDATE,
                     false);
 
-    /** Function used to access a event time attribute with TIMESTAMP TYPE from MATCH_RECOGNIZE. */
+    /**
+     * Function used to access a event time attribute with TIMESTAMP or TIMESTAMP_LTZ type from
+     * MATCH_RECOGNIZE.
+     */
     public static final SqlFunction MATCH_ROWTIME =
             new CalciteSqlFunction(
                     "MATCH_ROWTIME",

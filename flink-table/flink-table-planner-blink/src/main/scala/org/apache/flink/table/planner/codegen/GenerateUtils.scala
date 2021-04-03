@@ -512,9 +512,9 @@ object GenerateUtils {
       contextTerm: String,
       isTimestampLtz: Boolean): GeneratedExpression = {
     val resultType = if (isTimestampLtz) {
-      new TimestampType(true, TimestampKind.ROWTIME, 3)
-    } else {
       new LocalZonedTimestampType(true, TimestampKind.ROWTIME, 3)
+    } else {
+      new TimestampType(true, TimestampKind.ROWTIME, 3)
     }
     val resultTypeTerm = primitiveTypeTermForType(resultType)
     val Seq(resultTerm, nullTerm, timestamp) = ctx.addReusableLocalVariables(

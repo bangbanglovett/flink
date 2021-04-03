@@ -36,9 +36,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
-
 import java.sql.Timestamp
-import java.time.Instant
+import java.time.{Instant, ZoneId}
 import java.util.TimeZone
 
 import scala.collection.mutable
@@ -370,6 +369,7 @@ class MatchRecognizeITCase(backend: StateBackendMode) extends StreamingWithState
     val env = StreamExecutionEnvironment.getExecutionEnvironment
     val tEnv = StreamTableEnvironment.create(env, TableTestUtil.STREAM_SETTING)
 
+    tEnv.getConfig.setLocalTimeZone(ZoneId.of("UTC"))
     val data: Seq[Row] = Seq(
       //first window
       rowOf("ACME", Instant.ofEpochMilli(1), 1, 1),

@@ -30,7 +30,7 @@ import java.io.Serializable;
 import java.time.ZoneId;
 import java.util.Collection;
 
-import static org.apache.flink.table.runtime.util.TimeWindowUtil.toUtcTimestampMills;
+import static org.apache.flink.table.runtime.util.TimeWindowUtil.toEpochMillsForTimer;
 
 /**
  * The internal interface for functions that process over grouped windows.
@@ -128,7 +128,7 @@ public abstract class InternalWindowProcessFunction<K, W extends Window> impleme
      * @param window the window whose cleanup time we are computing.
      */
     private long cleanupTime(W window) {
-        long windowMaxTs = toUtcTimestampMills(window.maxTimestamp(), ctx.getShiftTimeZone());
+        long windowMaxTs = toEpochMillsForTimer(window.maxTimestamp(), ctx.getShiftTimeZone());
         if (windowAssigner.isEventTime()) {
             long cleanupTime = windowMaxTs + allowedLateness;
             return cleanupTime >= windowMaxTs ? cleanupTime : Long.MAX_VALUE;

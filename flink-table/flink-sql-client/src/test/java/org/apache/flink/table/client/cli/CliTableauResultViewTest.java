@@ -180,7 +180,7 @@ public class CliTableauResultViewTest {
                         + System.lineSeparator()
                         + "+---------+-------------+----------------------+--------------------------------+----------------+----------------------------+"
                         + System.lineSeparator()
-                        + "|  (NULL) |           1 |                    2 |                            abc |           1.23 |      2020-03-01 18:39:14.0 |"
+                        + "|  (NULL) |           1 |                    2 |                            abc |           1.23 |        2020-03-01 18:39:14 |"
                         + System.lineSeparator()
                         + "|   false |      (NULL) |                    0 |                                |              1 |      2020-03-01 18:39:14.1 |"
                         + System.lineSeparator()
@@ -192,9 +192,9 @@ public class CliTableauResultViewTest {
                         + System.lineSeparator()
                         + "|  (NULL) |          -1 |                   -1 |     abcdefghijklmnopqrstuvwxyz |   -12345.06789 |                     (NULL) |"
                         + System.lineSeparator()
-                        + "|  (NULL) |          -1 |                   -1 |                   这是一段中文 |   -12345.06789 |      2020-03-04 18:39:14.0 |"
+                        + "|  (NULL) |          -1 |                   -1 |                   这是一段中文 |   -12345.06789 |        2020-03-04 18:39:14 |"
                         + System.lineSeparator()
-                        + "|  (NULL) |          -1 |                   -1 |  これは日本語をテストするた... |   -12345.06789 |      2020-03-04 18:39:14.0 |"
+                        + "|  (NULL) |          -1 |                   -1 |  これは日本語をテストするた... |   -12345.06789 |        2020-03-04 18:39:14 |"
                         + System.lineSeparator()
                         + "+---------+-------------+----------------------+--------------------------------+----------------+----------------------------+"
                         + System.lineSeparator()
@@ -328,7 +328,7 @@ public class CliTableauResultViewTest {
                         + System.lineSeparator()
                         + "+----+---------+-------------+----------------------+--------------------------------+----------------+----------------------------+"
                         + System.lineSeparator()
-                        + "| +I |  (NULL) |           1 |                    2 |                            abc |           1.23 |      2020-03-01 18:39:14.0 |"
+                        + "| +I |  (NULL) |           1 |                    2 |                            abc |           1.23 |        2020-03-01 18:39:14 |"
                         + System.lineSeparator()
                         + "| -U |   false |      (NULL) |                    0 |                                |              1 |      2020-03-01 18:39:14.1 |"
                         + System.lineSeparator()
@@ -340,9 +340,9 @@ public class CliTableauResultViewTest {
                         + System.lineSeparator()
                         + "| -D |  (NULL) |          -1 |                   -1 |     abcdefghijklmnopqrstuvwxyz |   -12345.06789 |                     (NULL) |"
                         + System.lineSeparator()
-                        + "| +I |  (NULL) |          -1 |                   -1 |                   这是一段中文 |   -12345.06789 |      2020-03-04 18:39:14.0 |"
+                        + "| +I |  (NULL) |          -1 |                   -1 |                   这是一段中文 |   -12345.06789 |        2020-03-04 18:39:14 |"
                         + System.lineSeparator()
-                        + "| -D |  (NULL) |          -1 |                   -1 |  これは日本語をテストするた... |   -12345.06789 |      2020-03-04 18:39:14.0 |"
+                        + "| -D |  (NULL) |          -1 |                   -1 |  これは日本語をテストするた... |   -12345.06789 |        2020-03-04 18:39:14 |"
                         + System.lineSeparator()
                         + "+----+---------+-------------+----------------------+--------------------------------+----------------+----------------------------+"
                         + System.lineSeparator()
@@ -418,7 +418,7 @@ public class CliTableauResultViewTest {
                         + System.lineSeparator()
                         + "+----+---------+-------------+----------------------+--------------------------------+----------------+----------------------------+"
                         + System.lineSeparator()
-                        + "| +I |  (NULL) |           1 |                    2 |                            abc |           1.23 |      2020-03-01 18:39:14.0 |"
+                        + "| +I |  (NULL) |           1 |                    2 |                            abc |           1.23 |        2020-03-01 18:39:14 |"
                         + System.lineSeparator()
                         + "| -U |   false |      (NULL) |                    0 |                                |              1 |      2020-03-01 18:39:14.1 |"
                         + System.lineSeparator()
@@ -466,7 +466,7 @@ public class CliTableauResultViewTest {
                         + System.lineSeparator()
                         + "+----+---------+-------------+----------------------+--------------------------------+----------------+----------------------------+"
                         + System.lineSeparator()
-                        + "| +I |  (NULL) |           1 |                    2 |                            abc |           1.23 |      2020-03-01 18:39:14.0 |"
+                        + "| +I |  (NULL) |           1 |                    2 |                            abc |           1.23 |        2020-03-01 18:39:14 |"
                         + System.lineSeparator()
                         + "| -U |   false |      (NULL) |                    0 |                                |              1 |      2020-03-01 18:39:14.1 |"
                         + System.lineSeparator()

@@ -25,6 +25,10 @@ import org.apache.flink.table.data.conversion.DataStructureConverters;
 import org.apache.flink.table.runtime.typeutils.InternalTypeInfo;
 import org.apache.flink.table.types.DataType;
 
+import javax.annotation.Nullable;
+
+import java.util.Optional;
+
 import static org.apache.flink.table.types.utils.DataTypeUtils.validateOutputDataType;
 
 /** Implementation of {@link DynamicTableSink.Context}. */
@@ -32,14 +36,26 @@ import static org.apache.flink.table.types.utils.DataTypeUtils.validateOutputDat
 public final class SinkRuntimeProviderContext implements DynamicTableSink.Context {
 
     private final boolean isBounded;
+    private final Optional<DataType> timeAttributeType;
 
     public SinkRuntimeProviderContext(boolean isBounded) {
+        this(isBounded, null);
+    }
+
+    public SinkRuntimeProviderContext(boolean isBounded, @Nullable DataType timeAttributeType) {
         this.isBounded = isBounded;
+        this.timeAttributeType =
+                timeAttributeType == null ? Optional.empty() : Optional.of(timeAttributeType);
     }
 
     @Override
     public boolean isBounded() {
         return isBounded;
+    }
+
+    @Override
+    public Optional<DataType> getTimeAttributeDataType() {
+        return timeAttributeType;
     }
 
     @Override

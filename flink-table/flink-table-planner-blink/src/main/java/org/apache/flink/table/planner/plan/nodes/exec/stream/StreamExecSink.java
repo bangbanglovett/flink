@@ -31,7 +31,7 @@ import org.apache.flink.table.planner.plan.nodes.exec.common.CommonExecSink;
 import org.apache.flink.table.planner.plan.nodes.exec.serde.ChangelogModeJsonDeserializer;
 import org.apache.flink.table.planner.plan.nodes.exec.serde.ChangelogModeJsonSerializer;
 import org.apache.flink.table.planner.plan.nodes.exec.spec.DynamicTableSinkSpec;
-import org.apache.flink.table.runtime.typeutils.TypeCheckUtils;
+import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.RowType;
 
@@ -45,6 +45,11 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
+
+import static org.apache.flink.table.runtime.typeutils.TypeCheckUtils.isRowTime;
+import static org.apache.flink.table.runtime.typeutils.TypeCheckUtils.isTimestampWithLocalZone;
+import static org.apache.flink.table.types.logical.utils.LogicalTypeChecks.isTimeAttribute;
+import static org.apache.flink.table.types.utils.TypeConversions.fromLogicalToDataType;
 
 /**
  * Stream {@link ExecNode} to to write data into an external sink defined by a {@link
@@ -104,10 +109,15 @@ public class StreamExecSink extends CommonExecSink implements StreamExecNode<Obj
                 (Transformation<RowData>) inputEdge.translateToPlan(planner);
         final RowType inputRowType = (RowType) inputEdge.getOutputType();
 
+        DataType timeAttributeDataType = null;
         final List<Integer> rowtimeFieldIndices = new ArrayList<>();
         for (int i = 0; i < inputRowType.getFieldCount(); ++i) {
-            if (TypeCheckUtils.isRowTime(inputRowType.getTypeAt(i))) {
+            LogicalType fieldType = inputRowType.getTypeAt(i);
+            if (isRowTime(fieldType)) {
                 rowtimeFieldIndices.add(i);
+            }
+            if (isTimeAttribute(fieldType) && isTimestampWithLocalZone(fieldType)) {
+                timeAttributeDataType = fromLogicalToDataType(fieldType);
             }
         }
         final int rowtimeFieldIndex;
@@ -128,6 +138,10 @@ public class StreamExecSink extends CommonExecSink implements StreamExecNode<Obj
         }
 
         return createSinkTransformation(
-                planner.getExecEnv(), planner.getTableConfig(), inputTransform, rowtimeFieldIndex);
+                planner.getExecEnv(),
+                planner.getTableConfig(),
+                inputTransform,
+                rowtimeFieldIndex,
+                timeAttributeDataType);
     }
 }

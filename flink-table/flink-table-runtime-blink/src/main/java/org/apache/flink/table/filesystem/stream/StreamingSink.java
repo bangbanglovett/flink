@@ -21,6 +21,7 @@ package org.apache.flink.table.filesystem.stream;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.core.fs.FileSystem;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.streaming.api.datastream.DataStream;
@@ -40,16 +41,27 @@ import org.apache.flink.table.filesystem.stream.compact.CompactMessages.Coordina
 import org.apache.flink.table.filesystem.stream.compact.CompactOperator;
 import org.apache.flink.table.filesystem.stream.compact.CompactReader;
 import org.apache.flink.table.filesystem.stream.compact.CompactWriter;
+import org.apache.flink.table.types.DataType;
 import org.apache.flink.util.function.SupplierWithException;
+
+import javax.annotation.Nullable;
 
 import java.io.IOException;
 import java.io.Serializable;
+import java.time.ZoneId;
 import java.util.List;
+import java.util.TimeZone;
 
+import static org.apache.flink.table.api.config.TableConfigOptions.LOCAL_TIME_ZONE;
 import static org.apache.flink.table.filesystem.FileSystemOptions.SINK_PARTITION_COMMIT_POLICY_KIND;
+import static org.apache.flink.table.runtime.typeutils.TypeCheckUtils.isTimestampWithLocalZone;
+import static org.apache.flink.table.types.logical.utils.LogicalTypeChecks.isRowtimeAttribute;
 
 /** Helper for creating streaming file sink. */
 public class StreamingSink {
+
+    private static final ZoneId UTC_ZONE_ID = TimeZone.getTimeZone("UTC").toZoneId();
+
     private StreamingSink() {}
 
     /**
@@ -138,12 +150,19 @@ public class StreamingSink {
             List<String> partitionKeys,
             TableMetaStoreFactory msFactory,
             FileSystemFactory fsFactory,
-            Configuration options) {
+            Configuration options,
+            ZoneId rowtimeShiftTimeZone) {
         DataStream<?> stream = writer;
         if (partitionKeys.size() > 0 && options.contains(SINK_PARTITION_COMMIT_POLICY_KIND)) {
             PartitionCommitter committer =
                     new PartitionCommitter(
-                            locationPath, identifier, partitionKeys, msFactory, fsFactory, options);
+                            locationPath,
+                            identifier,
+                            partitionKeys,
+                            msFactory,
+                            fsFactory,
+                            options,
+                            rowtimeShiftTimeZone);
             stream =
                     writer.transform(
                                     PartitionCommitter.class.getSimpleName(), Types.VOID, committer)
@@ -152,5 +171,24 @@ public class StreamingSink {
         }
 
         return stream.addSink(new DiscardingSink<>()).name("end").setParallelism(1);
+    }
+
+    /**
+     * Returns the shift time zone of the rowtime attribute field if its type is TIMESTAMP_LTZ.
+     *
+     * <p>Returns UTC time zone for other cases which means the rowtime field hasn't been shifted.
+     */
+    public static ZoneId getRowtimeShiftTimeZone(
+            ReadableConfig config, @Nullable DataType timeAttributeDataType) {
+        if (timeAttributeDataType != null
+                && isRowtimeAttribute(timeAttributeDataType.getLogicalType())
+                && isTimestampWithLocalZone(timeAttributeDataType.getLogicalType())) {
+            String zoneId = config.get(LOCAL_TIME_ZONE);
+            return LOCAL_TIME_ZONE.defaultValue().equals(zoneId)
+                    ? ZoneId.systemDefault()
+                    : ZoneId.of(zoneId);
+        } else {
+            return UTC_ZONE_ID;
+        }
     }
 }

@@ -58,6 +58,7 @@ import org.apache.flink.table.runtime.keyselector.RowDataKeySelector;
 import org.apache.flink.table.runtime.operators.sink.SinkNotNullEnforcer;
 import org.apache.flink.table.runtime.operators.sink.SinkOperator;
 import org.apache.flink.table.runtime.typeutils.InternalTypeInfo;
+import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.utils.TableSchemaUtils;
@@ -110,10 +111,12 @@ public abstract class CommonExecSink extends ExecNodeBase<Object>
             StreamExecutionEnvironment env,
             TableConfig tableConfig,
             Transformation<RowData> inputTransform,
-            int rowtimeFieldIndex) {
+            int rowtimeFieldIndex,
+            DataType timeAttributeDataType) {
         final DynamicTableSink tableSink = tableSinkSpec.getTableSink();
         final DynamicTableSink.SinkRuntimeProvider runtimeProvider =
-                tableSink.getSinkRuntimeProvider(new SinkRuntimeProviderContext(isBounded));
+                tableSink.getSinkRuntimeProvider(
+                        new SinkRuntimeProviderContext(isBounded, timeAttributeDataType));
         final TableSchema tableSchema = tableSinkSpec.getCatalogTable().getSchema();
         inputTransform = applyNotNullEnforcer(tableConfig, tableSchema, inputTransform);
 

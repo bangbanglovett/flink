@@ -35,6 +35,7 @@ import org.apache.flink.table.filesystem.PartitionCommitPolicy;
 import org.apache.flink.table.filesystem.TableMetaStoreFactory;
 
 import java.io.IOException;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -65,6 +66,8 @@ public class PartitionCommitter extends AbstractStreamOperator<Void>
 
     private final Configuration conf;
 
+    private final ZoneId rowtimeShiftTimeZone;
+
     private final Path locationPath;
 
     private final ObjectIdentifier tableIdentifier;
@@ -89,13 +92,15 @@ public class PartitionCommitter extends AbstractStreamOperator<Void>
             List<String> partitionKeys,
             TableMetaStoreFactory metaStoreFactory,
             FileSystemFactory fsFactory,
-            Configuration conf) {
+            Configuration conf,
+            ZoneId rowtimeShiftTimeZone) {
         this.locationPath = locationPath;
         this.tableIdentifier = tableIdentifier;
         this.partitionKeys = partitionKeys;
         this.metaStoreFactory = metaStoreFactory;
         this.fsFactory = fsFactory;
         this.conf = conf;
+        this.rowtimeShiftTimeZone = rowtimeShiftTimeZone;
         PartitionCommitPolicy.validatePolicyChain(
                 metaStoreFactory instanceof EmptyMetaStoreFactory,
                 conf.get(SINK_PARTITION_COMMIT_POLICY_KIND));
@@ -112,7 +117,8 @@ public class PartitionCommitter extends AbstractStreamOperator<Void>
                         conf,
                         getUserCodeClassloader(),
                         partitionKeys,
-                        getProcessingTimeService());
+                        getProcessingTimeService(),
+                        rowtimeShiftTimeZone);
         this.policies =
                 PartitionCommitPolicy.createPolicyChain(
                         getUserCodeClassloader(),

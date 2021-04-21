@@ -60,6 +60,7 @@ import org.apache.flink.table.filesystem.FileSystemTableSink.TableBucketAssigner
 import org.apache.flink.table.filesystem.stream.PartitionCommitInfo;
 import org.apache.flink.table.filesystem.stream.StreamingSink;
 import org.apache.flink.table.filesystem.stream.compact.CompactReader;
+import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.utils.TableSchemaUtils;
@@ -85,6 +86,7 @@ import javax.annotation.Nullable;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.time.ZoneId;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -96,6 +98,7 @@ import static org.apache.flink.table.catalog.hive.util.HiveTableUtil.checkAcidTa
 import static org.apache.flink.table.filesystem.FileSystemOptions.SINK_ROLLING_POLICY_CHECK_INTERVAL;
 import static org.apache.flink.table.filesystem.FileSystemOptions.SINK_ROLLING_POLICY_FILE_SIZE;
 import static org.apache.flink.table.filesystem.FileSystemOptions.SINK_ROLLING_POLICY_ROLLOVER_INTERVAL;
+import static org.apache.flink.table.filesystem.stream.StreamingSink.getRowtimeShiftTimeZone;
 import static org.apache.flink.table.filesystem.stream.compact.CompactOperator.convertToUncompacted;
 
 /** Table sink to write to Hive tables. */
@@ -140,12 +143,18 @@ public class HiveTableSink implements DynamicTableSink, SupportsPartitioning, Su
     public SinkRuntimeProvider getSinkRuntimeProvider(Context context) {
         DataStructureConverter converter =
                 context.createDataStructureConverter(tableSchema.toRowDataType());
+        DataType timeAttributeDataType = context.getTimeAttributeDataType().orElse(null);
+        ZoneId rowtimeShiftTimeZone = getRowtimeShiftTimeZone(flinkConf, timeAttributeDataType);
         return (DataStreamSinkProvider)
-                dataStream -> consume(dataStream, context.isBounded(), converter);
+                dataStream ->
+                        consume(dataStream, context.isBounded(), converter, rowtimeShiftTimeZone);
     }
 
     private DataStreamSink<?> consume(
-            DataStream<RowData> dataStream, boolean isBounded, DataStructureConverter converter) {
+            DataStream<RowData> dataStream,
+            boolean isBounded,
+            DataStructureConverter converter,
+            ZoneId rowtimeShiftTimeZone) {
         checkAcidTable(catalogTable, identifier.toObjectPath());
 
         try (HiveMetastoreClientWrapper client =
@@ -190,8 +199,15 @@ public class HiveTableSink implements DynamicTableSink, SupportsPartitioning, Su
                 }
 
                 Properties tableProps = HiveReflectionUtils.getTableMetadata(hiveShim, table);
+
                 return createStreamSink(
-                        dataStream, sd, tableProps, writerFactory, fileNamingBuilder, parallelism);
+                        dataStream,
+                        sd,
+                        tableProps,
+                        writerFactory,
+                        fileNamingBuilder,
+                        parallelism,
+                        rowtimeShiftTimeZone);
             }
         } catch (TException e) {
             throw new CatalogException("Failed to query Hive metaStore", e);
@@ -242,7 +258,8 @@ public class HiveTableSink implements DynamicTableSink, SupportsPartitioning, Su
             Properties tableProps,
             HiveWriterFactory recordWriterFactory,
             OutputFileConfig.OutputFileConfigBuilder fileNamingBuilder,
-            final int parallelism) {
+            final int parallelism,
+            ZoneId rowtimeShiftTimeZone) {
         org.apache.flink.configuration.Configuration conf =
                 new org.apache.flink.configuration.Configuration();
         catalogTable.getOptions().forEach(conf::setString);
@@ -322,7 +339,14 @@ public class HiveTableSink implements DynamicTableSink, SupportsPartitioning, Su
         }
 
         return StreamingSink.sink(
-                writerStream, path, identifier, getPartitionKeys(), msFactory(), fsFactory(), conf);
+                writerStream,
+                path,
+                identifier,
+                getPartitionKeys(),
+                msFactory(),
+                fsFactory(),
+                conf,
+                rowtimeShiftTimeZone);
     }
 
     private String defaultPartName() {

@@ -36,6 +36,7 @@ import org.apache.flink.types.RowKind;
 import javax.annotation.Nullable;
 
 import java.io.Serializable;
+import java.util.Optional;
 
 /**
  * Sink of a dynamic table to an external storage system.
@@ -141,6 +142,14 @@ public interface DynamicTableSink {
          * query.
          */
         boolean isBounded();
+
+        /**
+         * Returns the DataType of the input time attribute field.
+         *
+         * <p>This information can be used to compare a table partition value with watermark in
+         * partition commit scenario.
+         */
+        Optional<DataType> getTimeAttributeDataType();
 
         /**
          * Creates type information describing the internal data structures of the given {@link

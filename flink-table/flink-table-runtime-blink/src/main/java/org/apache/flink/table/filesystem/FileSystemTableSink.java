@@ -74,6 +74,7 @@ import javax.annotation.Nullable;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.time.ZoneId;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -88,6 +89,7 @@ import java.util.stream.Stream;
 import static org.apache.flink.table.filesystem.FileSystemOptions.SINK_ROLLING_POLICY_CHECK_INTERVAL;
 import static org.apache.flink.table.filesystem.FileSystemOptions.SINK_ROLLING_POLICY_FILE_SIZE;
 import static org.apache.flink.table.filesystem.FileSystemOptions.SINK_ROLLING_POLICY_ROLLOVER_INTERVAL;
+import static org.apache.flink.table.filesystem.stream.StreamingSink.getRowtimeShiftTimeZone;
 import static org.apache.flink.table.filesystem.stream.compact.CompactOperator.convertToUncompacted;
 
 /** File system {@link DynamicTableSink}. */
@@ -189,6 +191,10 @@ public class FileSystemTableSink extends AbstractFileSystemTable
         RowDataPartitionComputer computer = partitionComputer();
 
         boolean autoCompaction = tableOptions.getBoolean(FileSystemOptions.AUTO_COMPACTION);
+        DataType timeAttributeDataType = sinkContext.getTimeAttributeDataType().orElse(null);
+        ZoneId rowtimeShiftTimeZone =
+                getRowtimeShiftTimeZone(context.getConfiguration(), timeAttributeDataType);
+
         Object writer = createWriter(sinkContext);
         boolean isEncoder = writer instanceof Encoder;
         TableBucketAssigner assigner = new TableBucketAssigner(computer);
@@ -269,7 +275,8 @@ public class FileSystemTableSink extends AbstractFileSystemTable
                 partitionKeys,
                 new EmptyMetaStoreFactory(path),
                 fsFactory,
-                tableOptions);
+                tableOptions,
+                rowtimeShiftTimeZone);
     }
 
     private Optional<CompactReader.Factory<RowData>> createCompactReaderFactory(Context context) {

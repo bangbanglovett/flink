@@ -23,6 +23,7 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.runtime.tasks.ProcessingTimeService;
 
 import java.io.IOException;
+import java.time.ZoneId;
 import java.util.List;
 
 import static org.apache.flink.table.filesystem.FileSystemOptions.SINK_PARTITION_COMMIT_TRIGGER;
@@ -54,13 +55,14 @@ public interface PartitionCommitTrigger {
             Configuration conf,
             ClassLoader cl,
             List<String> partitionKeys,
-            ProcessingTimeService procTimeService)
+            ProcessingTimeService procTimeService,
+            ZoneId rowtimeShiftTimeZone)
             throws Exception {
         String trigger = conf.get(SINK_PARTITION_COMMIT_TRIGGER);
         switch (trigger) {
             case PARTITION_TIME:
                 return new PartitionTimeCommitTrigger(
-                        isRestored, stateStore, conf, cl, partitionKeys);
+                        isRestored, stateStore, conf, cl, partitionKeys, rowtimeShiftTimeZone);
             case PROCESS_TIME:
                 return new ProcTimeCommitTrigger(isRestored, stateStore, conf, procTimeService);
             default:

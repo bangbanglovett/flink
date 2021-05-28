@@ -737,7 +737,7 @@ class ExprCodeGenerator(ctx: CodeGeneratorContext, nullableInput: Boolean)
         operands.foreach { operand =>
           requireComparable(operand)
         }
-        generateGreatestLeast(resultType, operands, greatest = false)
+        generateGreatestLeast(resultType, operands, false)
 
       case ITEM =>
         operands.head.resultType.getTypeRoot match {

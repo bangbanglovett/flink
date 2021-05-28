@@ -1788,7 +1788,7 @@ object ScalarOperatorGens {
       }
     }
 
-    val elementsCode = elements.zipWithIndex.map { case (element, idx) =>
+    val elementsCode = elements.map { element =>
       s"""
          | ${element.code}
          | if (!$nullTerm) {

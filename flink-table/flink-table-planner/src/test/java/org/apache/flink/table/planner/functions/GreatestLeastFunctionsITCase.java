@@ -56,7 +56,10 @@ public class GreatestLeastFunctionsITCase extends BuiltInFunctionTestBase {
                                 DataTypes.STRING().notNull(),
                                 DataTypes.TIMESTAMP(3).notNull(),
                                 DataTypes.TIMESTAMP(3).notNull())
-                        .testSqlError("GREATEST(f1, f4)", "Cannot infer return type for GREATEST")
+                        .testSqlError(
+                                "GREATEST(f1, f4)",
+                                "SQL validation failed. Invalid function call:\n"
+                                        + "GREATEST(INT NOT NULL, STRING NOT NULL)")
                         .testSqlResult(
                                 "CAST(GREATEST(f1, f3, f2) AS DECIMAL(3, 2))",
                                 BigDecimal.valueOf(3.14),
@@ -75,7 +78,10 @@ public class GreatestLeastFunctionsITCase extends BuiltInFunctionTestBase {
                                 "GREATEST(f6, f7)",
                                 LocalDateTime.parse("1970-01-01T00:00:03.001"),
                                 DataTypes.TIMESTAMP(3).notNull())
-                        .testSqlError("GREATEST(f5, f6)", "Cannot infer return type for GREATEST"),
+                        .testSqlError(
+                                "GREATEST(f5, f6)",
+                                "SQL validation failed. Invalid function call:\n"
+                                        + "GREATEST(STRING NOT NULL, TIMESTAMP(3) NOT NULL)"),
                 TestSpec.forFunction(BuiltInFunctionDefinitions.LEAST)
                         .onFieldsWithData(null, 1, 2, 3.14, "hello", "world")
                         .andDataTypes(
@@ -85,7 +91,10 @@ public class GreatestLeastFunctionsITCase extends BuiltInFunctionTestBase {
                                 DataTypes.DECIMAL(3, 2).notNull(),
                                 DataTypes.STRING().notNull(),
                                 DataTypes.STRING().notNull())
-                        .testSqlError("LEAST(f1, f4)", "Cannot infer return type for LEAST")
+                        .testSqlError(
+                                "LEAST(f1, f4)",
+                                "SQL validation failed. Invalid function call:\n"
+                                        + "LEAST(INT NOT NULL, STRING NOT NULL)")
                         .testSqlResult(
                                 "CAST(LEAST(f1, f3, f2) AS DECIMAL(3, 2))",
                                 BigDecimal.valueOf(100, 2),

@@ -289,7 +289,8 @@ public final class BuiltInFunctionDefinitions {
                     .kind(SCALAR)
                     .inputTypeStrategy(
                             comparable(ConstantArgumentCount.from(1), StructuredComparision.FULL))
-                    .outputTypeStrategy(nullable(TypeStrategies.GREATEST_LEAST))
+                    .outputTypeStrategy(nullable(TypeStrategies.COMMON))
+                    .runtimeProvided()
                     .build();
 
     public static final BuiltInFunctionDefinition LEAST =
@@ -298,7 +299,8 @@ public final class BuiltInFunctionDefinitions {
                     .kind(SCALAR)
                     .inputTypeStrategy(
                             comparable(ConstantArgumentCount.from(1), StructuredComparision.FULL))
-                    .outputTypeStrategy(nullable(TypeStrategies.GREATEST_LEAST))
+                    .outputTypeStrategy(nullable(TypeStrategies.COMMON))
+                    .runtimeProvided()
                     .build();
 
     // --------------------------------------------------------------------------------------------
